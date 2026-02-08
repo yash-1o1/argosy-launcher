@@ -108,6 +108,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import javax.inject.Inject
+import com.nendo.argosy.data.social.SocialAuthManager
+import com.nendo.argosy.data.social.SocialConnectionState
+import com.nendo.argosy.data.social.SocialRepository
 
 private const val TAG = "SettingsViewModel"
 
@@ -148,7 +151,8 @@ class SettingsViewModel @Inject constructor(
     private val gradientColorExtractor: GradientColorExtractor,
     private val coreManager: LibretroCoreManager,
     private val inputConfigRepository: com.nendo.argosy.data.repository.InputConfigRepository,
-    private val frameRegistry: com.nendo.argosy.libretro.frame.FrameRegistry
+    private val frameRegistry: com.nendo.argosy.libretro.frame.FrameRegistry,
+    private val socialRepository: SocialRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -193,6 +197,7 @@ class SettingsViewModel @Inject constructor(
         observeDelegateEvents()
         observeModalResetSignal()
         observeConnectionState()
+        observeSocialConnectionState()
         observePlatformLibretroSettings()
         loadAvailablePlatformsForLibretro()
         loadSettings()
@@ -229,6 +234,49 @@ class SettingsViewModel @Inject constructor(
                 connectionStatus = status,
                 rommVersion = version
             ))
+        }.launchIn(viewModelScope)
+    }
+
+    private fun observeSocialConnectionState() {
+        socialRepository.connectionState.onEach { state ->
+            when (state) {
+                is SocialConnectionState.Disconnected -> {
+                    _uiState.update { it.copy(social = SocialState(
+                        authStatus = SocialAuthStatus.NOT_LINKED
+                    )) }
+                }
+                is SocialConnectionState.Connecting -> {
+                    _uiState.update { it.copy(social = it.social.copy(
+                        authStatus = SocialAuthStatus.CONNECTING
+                    )) }
+                }
+                is SocialConnectionState.Connected -> {
+                    val prefs = preferencesRepository.userPreferences.first()
+                    _uiState.update { it.copy(social = SocialState(
+                        authStatus = SocialAuthStatus.CONNECTED,
+                        username = state.user.username,
+                        displayName = state.user.displayName,
+                        avatarColor = state.user.avatarColor,
+                        onlineStatusEnabled = prefs.socialOnlineStatusEnabled,
+                        showNowPlaying = prefs.socialShowNowPlaying,
+                        notifyFriendOnline = prefs.socialNotifyFriendOnline,
+                        notifyFriendPlaying = prefs.socialNotifyFriendPlaying
+                    )) }
+                }
+                is SocialConnectionState.AwaitingAuth -> {
+                    _uiState.update { it.copy(social = it.social.copy(
+                        authStatus = SocialAuthStatus.AWAITING_AUTH,
+                        qrUrl = state.qrUrl,
+                        loginCode = state.loginCode
+                    )) }
+                }
+                is SocialConnectionState.Failed -> {
+                    _uiState.update { it.copy(social = it.social.copy(
+                        authStatus = SocialAuthStatus.ERROR,
+                        errorMessage = state.reason
+                    )) }
+                }
+            }
         }.launchIn(viewModelScope)
     }
 
@@ -1921,6 +1969,7 @@ class SettingsViewModel @Inject constructor(
                 }
                 SettingsSection.PERMISSIONS -> permissionsMaxFocusIndex(state.permissions)
                 SettingsSection.ABOUT -> aboutMaxFocusIndex(state.fileLoggingPath != null)
+                SettingsSection.SOCIAL -> socialMaxFocusIndex(state.social)
             }
             val newIndex = if (state.currentSection == SettingsSection.SERVER && state.server.rommConfiguring) {
                 when {
@@ -3197,6 +3246,7 @@ class SettingsViewModel @Inject constructor(
                     MainSettingsItem.Controls -> navigateToSection(SettingsSection.CONTROLS)
                     MainSettingsItem.Emulators -> navigateToSection(SettingsSection.EMULATORS)
                     MainSettingsItem.Bios -> navigateToSection(SettingsSection.BIOS)
+                    MainSettingsItem.Social -> navigateToSection(SettingsSection.SOCIAL)
                     MainSettingsItem.Permissions -> navigateToSection(SettingsSection.PERMISSIONS)
                     MainSettingsItem.About -> navigateToSection(SettingsSection.ABOUT)
                     null -> {}
@@ -3587,6 +3637,58 @@ class SettingsViewModel @Inject constructor(
                 selectCoreForPlatform()
                 InputResult.HANDLED
             }
+            SettingsSection.SOCIAL -> {
+                handleSocialConfirm(state)
+            }
+        }
+    }
+
+    private fun handleSocialConfirm(state: SettingsUiState): InputResult {
+        return when (state.social.authStatus) {
+            SocialAuthStatus.NOT_LINKED -> {
+                startSocialAuth()
+                InputResult.HANDLED
+            }
+            SocialAuthStatus.AWAITING_AUTH -> {
+                cancelSocialAuth()
+                InputResult.HANDLED
+            }
+            SocialAuthStatus.CONNECTED -> {
+                when (state.focusedIndex) {
+                    1 -> {
+                        setSocialOnlineStatus(!state.social.onlineStatusEnabled)
+                        InputResult.handled(SoundType.TOGGLE)
+                    }
+                    2 -> {
+                        setSocialShowNowPlaying(!state.social.showNowPlaying)
+                        InputResult.handled(SoundType.TOGGLE)
+                    }
+                    3 -> {
+                        setSocialNotifyFriendOnline(!state.social.notifyFriendOnline)
+                        InputResult.handled(SoundType.TOGGLE)
+                    }
+                    4 -> {
+                        setSocialNotifyFriendPlaying(!state.social.notifyFriendPlaying)
+                        InputResult.handled(SoundType.TOGGLE)
+                    }
+                    5 -> {
+                        logoutSocial()
+                        InputResult.HANDLED
+                    }
+                    else -> InputResult.UNHANDLED
+                }
+            }
+            else -> InputResult.UNHANDLED
+        }
+    }
+
+    private fun socialMaxFocusIndex(social: SocialState): Int {
+        return when (social.authStatus) {
+            SocialAuthStatus.NOT_LINKED -> 0
+            SocialAuthStatus.AWAITING_AUTH -> 0
+            SocialAuthStatus.CONNECTING -> 0
+            SocialAuthStatus.CONNECTED -> 5
+            SocialAuthStatus.ERROR -> 0
         }
     }
 
@@ -3686,6 +3788,102 @@ class SettingsViewModel @Inject constructor(
                 }
             }
             return -1
+        }
+    }
+
+    fun startSocialAuth() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(social = it.social.copy(
+                authStatus = SocialAuthStatus.CONNECTING
+            )) }
+
+            val result = socialRepository.startAuth()
+
+            when (result) {
+                is SocialAuthManager.AuthResult.Success -> {
+                    _uiState.update { it.copy(social = SocialState(
+                        authStatus = SocialAuthStatus.CONNECTED,
+                        username = result.user.username,
+                        displayName = result.user.displayName,
+                        avatarColor = result.user.avatarColor,
+                        onlineStatusEnabled = true,
+                        showNowPlaying = true
+                    )) }
+                }
+                is SocialAuthManager.AuthResult.Error -> {
+                    _uiState.update { it.copy(social = it.social.copy(
+                        authStatus = SocialAuthStatus.ERROR,
+                        errorMessage = result.message
+                    )) }
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            socialRepository.authState.collect { state ->
+                when (state) {
+                    is SocialAuthManager.AuthState.AwaitingLogin -> {
+                        _uiState.update { it.copy(social = it.social.copy(
+                            authStatus = SocialAuthStatus.AWAITING_AUTH,
+                            qrUrl = state.qrUrl,
+                            loginCode = state.loginCode
+                        )) }
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
+
+    fun cancelSocialAuth() {
+        socialRepository.cancelAuth()
+        _uiState.update { it.copy(social = SocialState(
+            authStatus = SocialAuthStatus.NOT_LINKED
+        )) }
+    }
+
+    fun logoutSocial() {
+        viewModelScope.launch {
+            socialRepository.logout()
+            _uiState.update { it.copy(social = SocialState(
+                authStatus = SocialAuthStatus.NOT_LINKED
+            )) }
+        }
+    }
+
+    fun setSocialOnlineStatus(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setSocialOnlineStatusEnabled(enabled)
+            _uiState.update { it.copy(social = it.social.copy(
+                onlineStatusEnabled = enabled
+            )) }
+        }
+    }
+
+    fun setSocialShowNowPlaying(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setSocialShowNowPlaying(enabled)
+            _uiState.update { it.copy(social = it.social.copy(
+                showNowPlaying = enabled
+            )) }
+        }
+    }
+
+    fun setSocialNotifyFriendOnline(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setSocialNotifyFriendOnline(enabled)
+            _uiState.update { it.copy(social = it.social.copy(
+                notifyFriendOnline = enabled
+            )) }
+        }
+    }
+
+    fun setSocialNotifyFriendPlaying(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setSocialNotifyFriendPlaying(enabled)
+            _uiState.update { it.copy(social = it.social.copy(
+                notifyFriendPlaying = enabled
+            )) }
         }
     }
 

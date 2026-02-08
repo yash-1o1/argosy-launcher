@@ -29,9 +29,11 @@ import com.nendo.argosy.data.local.dao.PendingStateSyncDao
 import com.nendo.argosy.data.local.dao.PendingSyncDao
 import com.nendo.argosy.data.local.dao.PinnedCollectionDao
 import com.nendo.argosy.data.local.dao.PlatformDao
+import com.nendo.argosy.data.local.dao.PlaySessionDao
 import com.nendo.argosy.data.local.dao.PlatformLibretroSettingsDao
 import com.nendo.argosy.data.local.dao.SaveCacheDao
 import com.nendo.argosy.data.local.dao.SaveSyncDao
+import com.nendo.argosy.data.local.dao.SocialGameCacheDao
 import com.nendo.argosy.data.local.dao.StateCacheDao
 import com.nendo.argosy.data.local.entity.AchievementEntity
 import com.nendo.argosy.data.local.entity.AppCategoryEntity
@@ -58,8 +60,10 @@ import com.nendo.argosy.data.local.entity.PendingSyncEntity
 import com.nendo.argosy.data.local.entity.PinnedCollectionEntity
 import com.nendo.argosy.data.local.entity.PlatformEntity
 import com.nendo.argosy.data.local.entity.PlatformLibretroSettingsEntity
+import com.nendo.argosy.data.local.entity.PlaySessionEntity
 import com.nendo.argosy.data.local.entity.SaveCacheEntity
 import com.nendo.argosy.data.local.entity.SaveSyncEntity
+import com.nendo.argosy.data.local.entity.SocialGameCacheEntity
 import com.nendo.argosy.data.local.entity.StateCacheEntity
 
 @Database(
@@ -91,9 +95,11 @@ import com.nendo.argosy.data.local.entity.StateCacheEntity
         PendingAchievementEntity::class,
         PendingStateSyncEntity::class,
         PlatformLibretroSettingsEntity::class,
-        EmulatorUpdateEntity::class
+        EmulatorUpdateEntity::class,
+        PlaySessionEntity::class,
+        SocialGameCacheEntity::class
     ],
-    version = 74,
+    version = 76,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -125,6 +131,8 @@ abstract class ALauncherDatabase : RoomDatabase() {
     abstract fun pendingStateSyncDao(): PendingStateSyncDao
     abstract fun platformLibretroSettingsDao(): PlatformLibretroSettingsDao
     abstract fun emulatorUpdateDao(): EmulatorUpdateDao
+    abstract fun playSessionDao(): PlaySessionDao
+    abstract fun socialGameCacheDao(): SocialGameCacheDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -1136,6 +1144,85 @@ abstract class ALauncherDatabase : RoomDatabase() {
         val MIGRATION_73_74 = object : Migration(73, 74) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE platforms ADD COLUMN fsSlug TEXT DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_74_75 = object : Migration(74, 75) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS play_sessions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        userId TEXT,
+                        gameId INTEGER NOT NULL,
+                        igdbId INTEGER,
+                        gameTitle TEXT NOT NULL,
+                        platformSlug TEXT NOT NULL,
+                        startTime INTEGER NOT NULL,
+                        endTime INTEGER NOT NULL,
+                        continued INTEGER NOT NULL DEFAULT 0,
+                        deviceId TEXT NOT NULL,
+                        deviceManufacturer TEXT NOT NULL,
+                        deviceModel TEXT NOT NULL
+                    )
+                """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_play_sessions_gameId ON play_sessions(gameId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_play_sessions_igdbId ON play_sessions(igdbId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_play_sessions_startTime ON play_sessions(startTime)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_play_sessions_deviceId ON play_sessions(deviceId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_play_sessions_userId ON play_sessions(userId)")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS social_game_cache (
+                        igdbId INTEGER PRIMARY KEY NOT NULL,
+                        title TEXT NOT NULL,
+                        coverUrl TEXT,
+                        platformSlug TEXT,
+                        releaseYear INTEGER,
+                        fetchedAt INTEGER NOT NULL
+                    )
+                """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_social_game_cache_fetchedAt ON social_game_cache(fetchedAt)")
+            }
+        }
+
+        val MIGRATION_75_76 = object : Migration(75, 76) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS play_sessions")
+                db.execSQL("DROP TABLE IF EXISTS social_game_cache")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS play_sessions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        userId TEXT,
+                        gameId INTEGER NOT NULL,
+                        igdbId INTEGER,
+                        gameTitle TEXT NOT NULL,
+                        platformSlug TEXT NOT NULL,
+                        startTime INTEGER NOT NULL,
+                        endTime INTEGER NOT NULL,
+                        continued INTEGER NOT NULL DEFAULT 0,
+                        deviceId TEXT NOT NULL,
+                        deviceManufacturer TEXT NOT NULL,
+                        deviceModel TEXT NOT NULL
+                    )
+                """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_play_sessions_gameId ON play_sessions(gameId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_play_sessions_igdbId ON play_sessions(igdbId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_play_sessions_startTime ON play_sessions(startTime)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_play_sessions_deviceId ON play_sessions(deviceId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_play_sessions_userId ON play_sessions(userId)")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS social_game_cache (
+                        igdbId INTEGER PRIMARY KEY NOT NULL,
+                        title TEXT NOT NULL,
+                        coverUrl TEXT,
+                        platformSlug TEXT,
+                        releaseYear INTEGER,
+                        fetchedAt INTEGER NOT NULL
+                    )
+                """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_social_game_cache_fetchedAt ON social_game_cache(fetchedAt)")
             }
         }
     }

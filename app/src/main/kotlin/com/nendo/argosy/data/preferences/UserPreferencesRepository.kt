@@ -143,6 +143,17 @@ class UserPreferencesRepository @Inject constructor(
         val BUILTIN_FRAMES_ENABLED = booleanPreferencesKey("builtin_frames_enabled")
         val BUILTIN_MIGRATION_V1 = booleanPreferencesKey("builtin_migration_v2")
         val ANDROID_DATA_SAF_URI = stringPreferencesKey("android_data_saf_uri")
+
+        val SOCIAL_SESSION_TOKEN = stringPreferencesKey("social_session_token")
+        val SOCIAL_USER_ID = stringPreferencesKey("social_user_id")
+        val SOCIAL_USERNAME = stringPreferencesKey("social_username")
+        val SOCIAL_DISPLAY_NAME = stringPreferencesKey("social_display_name")
+        val SOCIAL_AVATAR_COLOR = stringPreferencesKey("social_avatar_color")
+        val SOCIAL_ONLINE_STATUS_ENABLED = booleanPreferencesKey("social_online_status_enabled")
+        val SOCIAL_SHOW_NOW_PLAYING = booleanPreferencesKey("social_show_now_playing")
+        val SOCIAL_NOTIFY_FRIEND_ONLINE = booleanPreferencesKey("social_notify_friend_online")
+        val SOCIAL_NOTIFY_FRIEND_PLAYING = booleanPreferencesKey("social_notify_friend_playing")
+        val SOCIAL_LAST_PLAY_SESSION_SYNC = stringPreferencesKey("social_last_play_session_sync")
     }
 
     val userPreferences: Flow<UserPreferences> = dataStore.data.map { prefs ->
@@ -264,7 +275,17 @@ class UserPreferencesRepository @Inject constructor(
             ambientLedAudioColors = prefs[Keys.AMBIENT_LED_AUDIO_COLORS] ?: false,
             ambientLedColorMode = AmbientLedColorMode.fromString(prefs[Keys.AMBIENT_LED_COLOR_MODE]),
             androidDataSafUri = prefs[Keys.ANDROID_DATA_SAF_URI],
-            builtinLibretroEnabled = prefs[Keys.BUILTIN_LIBRETRO_ENABLED] ?: true
+            builtinLibretroEnabled = prefs[Keys.BUILTIN_LIBRETRO_ENABLED] ?: true,
+            socialSessionToken = prefs[Keys.SOCIAL_SESSION_TOKEN],
+            socialUserId = prefs[Keys.SOCIAL_USER_ID],
+            socialUsername = prefs[Keys.SOCIAL_USERNAME],
+            socialDisplayName = prefs[Keys.SOCIAL_DISPLAY_NAME],
+            socialAvatarColor = prefs[Keys.SOCIAL_AVATAR_COLOR],
+            socialOnlineStatusEnabled = prefs[Keys.SOCIAL_ONLINE_STATUS_ENABLED] ?: true,
+            socialShowNowPlaying = prefs[Keys.SOCIAL_SHOW_NOW_PLAYING] ?: true,
+            socialNotifyFriendOnline = prefs[Keys.SOCIAL_NOTIFY_FRIEND_ONLINE] ?: true,
+            socialNotifyFriendPlaying = prefs[Keys.SOCIAL_NOTIFY_FRIEND_PLAYING] ?: true,
+            lastPlaySessionSync = prefs[Keys.SOCIAL_LAST_PLAY_SESSION_SYNC]?.let { java.time.Instant.parse(it) }
         )
     }
 
@@ -1074,6 +1095,64 @@ class UserPreferencesRepository @Inject constructor(
             prefs[Keys.BUILTIN_LIBRETRO_ENABLED] = enabled
         }
     }
+
+    suspend fun setSocialCredentials(
+        sessionToken: String,
+        userId: String,
+        username: String,
+        displayName: String?,
+        avatarColor: String?
+    ) {
+        dataStore.edit { prefs ->
+            prefs[Keys.SOCIAL_SESSION_TOKEN] = sessionToken
+            prefs[Keys.SOCIAL_USER_ID] = userId
+            prefs[Keys.SOCIAL_USERNAME] = username
+            if (displayName != null) prefs[Keys.SOCIAL_DISPLAY_NAME] = displayName
+            else prefs.remove(Keys.SOCIAL_DISPLAY_NAME)
+            if (avatarColor != null) prefs[Keys.SOCIAL_AVATAR_COLOR] = avatarColor
+            else prefs.remove(Keys.SOCIAL_AVATAR_COLOR)
+        }
+    }
+
+    suspend fun clearSocialCredentials() {
+        dataStore.edit { prefs ->
+            prefs.remove(Keys.SOCIAL_SESSION_TOKEN)
+            prefs.remove(Keys.SOCIAL_USER_ID)
+            prefs.remove(Keys.SOCIAL_USERNAME)
+            prefs.remove(Keys.SOCIAL_DISPLAY_NAME)
+            prefs.remove(Keys.SOCIAL_AVATAR_COLOR)
+        }
+    }
+
+    suspend fun setSocialOnlineStatusEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[Keys.SOCIAL_ONLINE_STATUS_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setSocialShowNowPlaying(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[Keys.SOCIAL_SHOW_NOW_PLAYING] = enabled
+        }
+    }
+
+    suspend fun setSocialNotifyFriendOnline(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[Keys.SOCIAL_NOTIFY_FRIEND_ONLINE] = enabled
+        }
+    }
+
+    suspend fun setSocialNotifyFriendPlaying(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[Keys.SOCIAL_NOTIFY_FRIEND_PLAYING] = enabled
+        }
+    }
+
+    suspend fun setLastPlaySessionSyncTime(time: java.time.Instant) {
+        dataStore.edit { prefs ->
+            prefs[Keys.SOCIAL_LAST_PLAY_SESSION_SYNC] = time.toString()
+        }
+    }
 }
 
 data class BuiltinEmulatorSettings(
@@ -1226,8 +1305,20 @@ data class UserPreferences(
     val ambientLedAudioColors: Boolean = false,
     val ambientLedColorMode: AmbientLedColorMode = AmbientLedColorMode.DOMINANT_3,
     val androidDataSafUri: String? = null,
-    val builtinLibretroEnabled: Boolean = true
-)
+    val builtinLibretroEnabled: Boolean = true,
+    val socialSessionToken: String? = null,
+    val socialUserId: String? = null,
+    val socialUsername: String? = null,
+    val socialDisplayName: String? = null,
+    val socialAvatarColor: String? = null,
+    val socialOnlineStatusEnabled: Boolean = true,
+    val socialShowNowPlaying: Boolean = true,
+    val socialNotifyFriendOnline: Boolean = true,
+    val socialNotifyFriendPlaying: Boolean = true,
+    val lastPlaySessionSync: java.time.Instant? = null
+) {
+    val isSocialLinked: Boolean get() = socialSessionToken != null
+}
 
 enum class ThemeMode(val displayName: String) {
     LIGHT("Light"),

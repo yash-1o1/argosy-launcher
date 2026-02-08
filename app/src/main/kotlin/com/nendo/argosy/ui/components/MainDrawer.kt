@@ -21,9 +21,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.FeaturedPlayList
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -277,6 +278,7 @@ private fun getIconForRoute(route: String): ImageVector = when (route) {
     Screen.Library.route -> Icons.Default.VideoLibrary
     Screen.Downloads.route -> Icons.Default.Download
     Screen.Apps.route -> Icons.Default.Apps
+    Screen.Social.route -> Icons.Default.People
     Screen.Settings.route -> Icons.Default.Settings
     else -> Icons.Default.Apps
 }

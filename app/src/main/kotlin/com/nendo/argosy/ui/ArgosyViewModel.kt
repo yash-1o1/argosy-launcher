@@ -19,6 +19,8 @@ import com.nendo.argosy.ui.components.FanMode
 import com.nendo.argosy.ui.components.PerformanceMode
 import com.nendo.argosy.util.PServerExecutor
 import com.nendo.argosy.data.repository.GameRepository
+import com.nendo.argosy.data.social.SocialConnectionState
+import com.nendo.argosy.data.social.SocialRepository
 import com.nendo.argosy.domain.usecase.libretro.LibretroMigrationUseCase
 import com.nendo.argosy.ui.input.ControllerDetector
 import com.nendo.argosy.ui.input.DetectedLayout
@@ -106,7 +108,8 @@ class ArgosyViewModel @Inject constructor(
     private val saveSyncRepository: SaveSyncRepository,
     private val gameDao: GameDao,
     private val libretroMigrationUseCase: LibretroMigrationUseCase,
-    private val emulatorUpdateManager: EmulatorUpdateManager
+    private val emulatorUpdateManager: EmulatorUpdateManager,
+    private val socialRepository: SocialRepository
 ) : ViewModel() {
 
     private val contentResolver get() = application.contentResolver
@@ -248,14 +251,22 @@ class ArgosyViewModel @Inject constructor(
         initialValue = DrawerState()
     )
 
-    val drawerItems = listOf(
+    private val allDrawerItems = listOf(
         DrawerItem(Screen.Home.route, "Home"),
+        DrawerItem(Screen.Social.route, "Friends"),
         DrawerItem(Screen.Collections.route, "Collections"),
         DrawerItem(Screen.Library.route, "Library"),
         DrawerItem(Screen.Downloads.route, "Downloads"),
         DrawerItem(Screen.Apps.route, "Apps"),
         DrawerItem(Screen.Settings.route, "Settings")
     )
+
+    val drawerItems: List<DrawerItem>
+        get() = if (socialRepository.connectionState.value is SocialConnectionState.Connected) {
+            allDrawerItems
+        } else {
+            allDrawerItems.filter { it.route != Screen.Social.route }
+        }
 
     private val _drawerFocusIndex = MutableStateFlow(0)
     val drawerFocusIndex: StateFlow<Int> = _drawerFocusIndex.asStateFlow()

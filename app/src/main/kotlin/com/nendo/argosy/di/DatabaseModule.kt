@@ -26,9 +26,11 @@ import com.nendo.argosy.data.local.dao.PendingStateSyncDao
 import com.nendo.argosy.data.local.dao.PendingSyncDao
 import com.nendo.argosy.data.local.dao.PinnedCollectionDao
 import com.nendo.argosy.data.local.dao.PlatformDao
+import com.nendo.argosy.data.local.dao.PlaySessionDao
 import com.nendo.argosy.data.local.dao.PlatformLibretroSettingsDao
 import com.nendo.argosy.data.local.dao.SaveCacheDao
 import com.nendo.argosy.data.local.dao.SaveSyncDao
+import com.nendo.argosy.data.local.dao.SocialGameCacheDao
 import com.nendo.argosy.data.local.dao.StateCacheDao
 import dagger.Module
 import dagger.Provides
@@ -122,7 +124,9 @@ object DatabaseModule {
                 ALauncherDatabase.MIGRATION_70_71,
                 ALauncherDatabase.MIGRATION_71_72,
                 ALauncherDatabase.MIGRATION_72_73,
-                ALauncherDatabase.MIGRATION_73_74
+                ALauncherDatabase.MIGRATION_73_74,
+                ALauncherDatabase.MIGRATION_74_75,
+                ALauncherDatabase.MIGRATION_75_76
             )
             .build()
     }
@@ -231,4 +235,12 @@ object DatabaseModule {
     @Provides
     fun provideEmulatorUpdateDao(database: ALauncherDatabase): EmulatorUpdateDao =
         database.emulatorUpdateDao()
+
+    @Provides
+    fun providePlaySessionDao(database: ALauncherDatabase): PlaySessionDao =
+        database.playSessionDao()
+
+    @Provides
+    fun provideSocialGameCacheDao(database: ALauncherDatabase): SocialGameCacheDao =
+        database.socialGameCacheDao()
 }
