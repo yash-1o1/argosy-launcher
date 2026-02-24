@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -43,12 +44,15 @@ fun AddToCollectionModal(
     onDismiss: () -> Unit
 ) {
     val filteredCollections = collections.filter { it.name.isNotBlank() }
+    val listState = rememberLazyListState()
+
+    FocusedScroll(listState = listState, focusedIndex = focusIndex)
 
     Modal(
         title = "ADD TO COLLECTION",
         onDismiss = onDismiss
     ) {
-        LazyColumn {
+        LazyColumn(state = listState) {
             itemsIndexed(filteredCollections, key = { _, c -> c.id }) { index, collection ->
                 CollectionCheckRow(
                     collection = collection,

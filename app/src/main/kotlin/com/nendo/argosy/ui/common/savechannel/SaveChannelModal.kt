@@ -36,12 +36,8 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import com.nendo.argosy.ui.theme.LocalLauncherTheme
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.focusable
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -64,12 +60,6 @@ fun SaveChannelModal(
 ) {
     if (!state.isVisible) return
 
-    val focusRequester = remember { FocusRequester() }
-
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
     val isDarkTheme = LocalLauncherTheme.current.isDarkTheme
     val overlayColor = if (isDarkTheme) {
         Color.Black.copy(alpha = 0.7f)
@@ -80,8 +70,6 @@ fun SaveChannelModal(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .focusRequester(focusRequester)
-            .focusable()
             .background(overlayColor)
             .clickableNoFocus(onClick = onDismiss),
         contentAlignment = Alignment.Center

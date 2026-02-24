@@ -13,8 +13,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.nendo.argosy.ui.util.clickableNoFocus
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,7 +38,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -80,11 +78,7 @@ fun DualStartMenuOverlay(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.6f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss
-                ),
+                .clickableNoFocus(onClick = onDismiss),
             contentAlignment = Alignment.Center
         ) {
             AnimatedVisibility(
@@ -95,11 +89,7 @@ fun DualStartMenuOverlay(
                 StartMenuCard(
                     focusedIndex = focusedIndex,
                     onItemSelected = onItemSelected,
-                    modifier = Modifier.clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {} // Prevent click-through to dismiss
-                    )
+                    modifier = Modifier.clickableNoFocus {}
                 )
             }
         }
@@ -220,7 +210,7 @@ private fun StartMenuItemRow(
                     Modifier.background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
                 } else Modifier
             )
-            .clickable(onClick = onClick)
+            .clickableNoFocus(onClick = onClick)
             .padding(horizontal = 24.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

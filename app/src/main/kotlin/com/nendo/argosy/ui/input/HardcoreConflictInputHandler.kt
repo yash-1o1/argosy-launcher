@@ -8,28 +8,22 @@ class HardcoreConflictInputHandler(
     private val onKeepLocal: () -> Unit
 ) : InputHandler {
 
+    private val actions = listOf(onKeepHardcore, onDowngradeToCasual, onKeepLocal)
+
     override fun onUp(): InputResult {
-        val currentIndex = getFocusIndex()
-        if (currentIndex > 0) {
-            onFocusChange(currentIndex - 1)
-        }
+        val index = getFocusIndex()
+        if (index > 0) onFocusChange(index - 1)
         return InputResult.HANDLED
     }
 
     override fun onDown(): InputResult {
-        val currentIndex = getFocusIndex()
-        if (currentIndex < 2) {
-            onFocusChange(currentIndex + 1)
-        }
+        val index = getFocusIndex()
+        if (index < actions.lastIndex) onFocusChange(index + 1)
         return InputResult.HANDLED
     }
 
     override fun onConfirm(): InputResult {
-        when (getFocusIndex()) {
-            0 -> onKeepHardcore()
-            1 -> onDowngradeToCasual()
-            2 -> onKeepLocal()
-        }
+        actions.getOrNull(getFocusIndex())?.invoke()
         return InputResult.HANDLED
     }
 
@@ -37,13 +31,4 @@ class HardcoreConflictInputHandler(
         onKeepLocal()
         return InputResult.HANDLED
     }
-
-    override fun onMenu(): InputResult = InputResult.HANDLED
-    override fun onSelect(): InputResult = InputResult.HANDLED
-    override fun onLeft(): InputResult = InputResult.HANDLED
-    override fun onRight(): InputResult = InputResult.HANDLED
-    override fun onPrevSection(): InputResult = InputResult.HANDLED
-    override fun onNextSection(): InputResult = InputResult.HANDLED
-    override fun onPrevTrigger(): InputResult = InputResult.HANDLED
-    override fun onNextTrigger(): InputResult = InputResult.HANDLED
 }

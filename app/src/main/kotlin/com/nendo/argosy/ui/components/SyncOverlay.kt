@@ -15,7 +15,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import com.nendo.argosy.ui.util.clickableNoFocus
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -517,7 +517,7 @@ private fun ConflictOption(
             .fillMaxWidth()
             .clip(RoundedCornerShape(Dimens.radiusMd))
             .background(backgroundColor)
-            .clickable(onClick = onClick)
+            .clickableNoFocus(onClick = onClick)
             .padding(horizontal = Dimens.spacingMd, vertical = Dimens.spacingSm)
     ) {
         Text(

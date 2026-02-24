@@ -1,9 +1,10 @@
 package com.nendo.argosy.ui.screens.common
 
-import com.nendo.argosy.data.local.entity.CollectionEntity
+import com.nendo.argosy.data.local.entity.CollectionType
 import com.nendo.argosy.data.repository.CollectionRepository
 import com.nendo.argosy.data.local.entity.CollectionGameEntity
 import com.nendo.argosy.data.remote.romm.RomMRepository
+import com.nendo.argosy.data.remote.romm.RomMResult
 import com.nendo.argosy.ui.input.SoundFeedbackManager
 import com.nendo.argosy.ui.input.SoundType
 import com.nendo.argosy.ui.screens.gamedetail.CollectionItemUi
@@ -35,11 +36,11 @@ class CollectionModalDelegate @Inject constructor(
 
     fun show(scope: CoroutineScope, gameId: Long) {
         scope.launch {
-            val allCollections = collectionRepository.getAllCollections()
+            val userCollections = collectionRepository.getAllByType(CollectionType.REGULAR)
                 .filter { it.name.isNotBlank() }
             val gameCollectionIds = collectionRepository.getCollectionIdsForGame(gameId)
 
-            val collectionItems = allCollections.map { collection ->
+            val collectionItems = userCollections.map { collection ->
                 CollectionItemUi(
                     id = collection.id,
                     name = collection.name,
@@ -139,22 +140,22 @@ class CollectionModalDelegate @Inject constructor(
         if (gameId == 0L) return
 
         scope.launch {
-            val collectionId = collectionRepository.insertCollection(
-                CollectionEntity(name = name)
-            )
+            val result = romMRepository.createCollectionWithSync(name)
+            val collectionId = (result as? RomMResult.Success)?.data ?: return@launch
+
             collectionRepository.addGameToCollection(
                 CollectionGameEntity(
                     collectionId = collectionId,
                     gameId = gameId
                 )
             )
-            romMRepository.createCollectionWithSync(name)
+            romMRepository.addGameToCollectionWithSync(gameId, collectionId)
 
-            val allCollections = collectionRepository.getAllCollections()
+            val userCollections = collectionRepository.getAllByType(CollectionType.REGULAR)
                 .filter { it.name.isNotBlank() }
             val gameCollectionIds = collectionRepository.getCollectionIdsForGame(gameId)
 
-            val collectionItems = allCollections.map { collection ->
+            val collectionItems = userCollections.map { collection ->
                 CollectionItemUi(
                     id = collection.id,
                     name = collection.name,

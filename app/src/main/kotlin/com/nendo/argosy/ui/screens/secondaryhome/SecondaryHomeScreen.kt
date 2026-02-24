@@ -6,7 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import com.nendo.argosy.ui.util.clickableNoFocus
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,7 +29,6 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.border
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.material.icons.Icons
@@ -46,7 +45,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -185,11 +183,7 @@ fun SecondaryHomeScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.5f))
-                    .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        indication = null,
-                        onClick = { viewModel.closeDrawer() }
-                    )
+                    .clickableNoFocus { viewModel.closeDrawer() }
             )
         }
 
@@ -242,7 +236,7 @@ private fun SectionHeader(
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                 .focusProperties { canFocus = false }
-                .clickable(enabled = hasPrevious, onClick = onPrevious),
+                .clickableNoFocus(enabled = hasPrevious, onClick = onPrevious),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -268,7 +262,7 @@ private fun SectionHeader(
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                 .focusProperties { canFocus = false }
-                .clickable(enabled = hasNext, onClick = onNext),
+                .clickableNoFocus(enabled = hasNext, onClick = onNext),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -450,7 +444,7 @@ private fun AppsRow(
                     .weight(1f)
                     .height(72.dp)
                     .focusProperties { canFocus = false }
-                    .clickable(onClick = onOpenDrawer),
+                    .clickableNoFocus(onClick = onOpenDrawer),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -505,7 +499,7 @@ private fun AppItem(
                         onLongPress = onLongPressAction,
                     )
                 } else {
-                    Modifier.clickable(onClick = onClick)
+                    Modifier.clickableNoFocus(onClick = onClick)
                 }
             )
             .padding(Dimens.spacingXs),
@@ -538,7 +532,7 @@ private fun AddAppButton(onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .width(64.dp)
-            .clickable(onClick = onClick)
+            .clickableNoFocus(onClick = onClick)
             .padding(Dimens.spacingXs),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -599,11 +593,7 @@ fun AllAppsDrawerOverlay(
                 MaterialTheme.colorScheme.surface,
                 RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
             )
-            .clickable(
-                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                indication = null,
-                onClick = {}
-            )
+            .clickableNoFocus {}
     ) {
         Box(
             modifier = Modifier
