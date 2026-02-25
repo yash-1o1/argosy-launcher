@@ -202,6 +202,7 @@ private fun routeStorageConfirm(vm: SettingsViewModel, state: SettingsUiState): 
         StorageItem.GlobalRomPath -> vm.openFolderPicker()
         StorageItem.ImageCache -> vm.openImageCachePicker()
         StorageItem.ValidateCache -> vm.validateImageCache()
+        StorageItem.ValidateDownloads -> vm.validateDownloads()
         StorageItem.PlatformsExpand -> vm.togglePlatformsExpanded()
         is StorageItem.PlatformItem -> vm.openPlatformSettingsModal(item.config.platformId)
         StorageItem.PurgeAll -> vm.requestPurgeAll()

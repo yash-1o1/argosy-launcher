@@ -555,6 +555,7 @@ class SettingsViewModel @Inject constructor(
     fun resetImageCacheToDefault() = syncDelegate.resetImageCacheToDefault(viewModelScope)
 
     fun validateImageCache() = routeValidateImageCache(this)
+    fun validateDownloads() = routeValidateDownloads(this)
 
     fun cycleMaxConcurrentDownloads() = storageDelegate.cycleMaxConcurrentDownloads(viewModelScope)
 

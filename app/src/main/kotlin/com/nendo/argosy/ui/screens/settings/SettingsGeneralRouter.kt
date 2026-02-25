@@ -590,6 +590,40 @@ internal fun routeValidateImageCache(vm: SettingsViewModel) {
     }
 }
 
+// --- Download validation ---
+
+internal fun routeValidateDownloads(vm: SettingsViewModel) {
+    if (vm._uiState.value.storage.isValidatingDownloads) return
+    vm._uiState.update { it.copy(storage = it.storage.copy(isValidatingDownloads = true)) }
+
+    val key = "download_validation"
+    vm.viewModelScope.launch {
+        try {
+            vm.notificationManager.showPersistent(
+                title = "Validating Downloads",
+                subtitle = "Checking ROM files...",
+                key = key,
+                progress = NotificationProgress(0, 100)
+            )
+
+            val invalidated = vm.gameRepository.validateLocalFiles()
+
+            vm.notificationManager.updatePersistent(
+                key = key,
+                subtitle = "Discovering files...",
+                progress = NotificationProgress(50, 100)
+            )
+
+            val discovered = vm.gameRepository.discoverLocalFiles()
+
+            val message = "Cleared $invalidated invalid paths, discovered $discovered files"
+            vm.notificationManager.completePersistent(key, message, type = NotificationType.SUCCESS)
+        } finally {
+            vm._uiState.update { it.copy(storage = it.storage.copy(isValidatingDownloads = false)) }
+        }
+    }
+}
+
 // --- Scan & Sync ---
 
 internal fun routeScanForAndroidGames(vm: SettingsViewModel) {

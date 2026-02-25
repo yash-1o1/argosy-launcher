@@ -51,6 +51,7 @@ internal sealed class StorageItem(
     data object GlobalRomPath : StorageItem("globalRomPath", "locations")
     data object ImageCache : StorageItem("imageCache", "locations")
     data object ValidateCache : StorageItem("validateCache", "locations")
+    data object ValidateDownloads : StorageItem("validateDownloads", "locations")
 
     data object PlatformsExpand : StorageItem("platformsExpand", "platforms")
     class PlatformItem(val config: PlatformStorageConfig) : StorageItem(
@@ -72,7 +73,7 @@ internal sealed class StorageItem(
 
         fun buildItems(platformConfigs: List<PlatformStorageConfig>): List<StorageItem> = listOf(
             DownloadsHeader, MaxDownloads, Threshold, DownloadedInfo,
-            LocationsSpacer, LocationsHeader, GlobalRomPath, ImageCache, ValidateCache,
+            LocationsSpacer, LocationsHeader, GlobalRomPath, ImageCache, ValidateCache, ValidateDownloads,
             PlatformsSpacer, PlatformsHeader, PlatformsExpand
         ) + platformConfigs.map { PlatformItem(it) } + listOf(
             DangerSpacer, DangerHeader, PurgeAll
@@ -88,7 +89,7 @@ private fun createStorageLayout(items: List<StorageItem>) = SettingsLayout<Stora
 )
 
 internal fun storageMaxFocusIndex(platformsExpanded: Boolean, platformCount: Int): Int {
-    val fixedFocusableCount = 7
+    val fixedFocusableCount = 8
     val expandedItems = if (platformsExpanded) platformCount else 0
     return (fixedFocusableCount + expandedItems - 1).coerceAtLeast(0)
 }
@@ -220,6 +221,17 @@ fun StorageSection(uiState: SettingsUiState, viewModel: SettingsViewModel) {
                         isFocused = isFocused(item),
                         isEnabled = !validating,
                         onClick = { viewModel.validateImageCache() }
+                    )
+                }
+
+                StorageItem.ValidateDownloads -> {
+                    val validating = storage.isValidatingDownloads
+                    ActionPreference(
+                        title = "Validate Downloads",
+                        subtitle = if (validating) "Validating..." else "Verify downloaded ROM files exist",
+                        isFocused = isFocused(item),
+                        isEnabled = !validating,
+                        onClick = { viewModel.validateDownloads() }
                     )
                 }
 

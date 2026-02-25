@@ -427,6 +427,7 @@ data class StorageState(
     val screenDimmerTimeoutMinutes: Int = 2,
     val screenDimmerLevel: Int = 30,
     val isValidatingCache: Boolean = false,
+    val isValidatingDownloads: Boolean = false,
     val showPurgeAllConfirm: Boolean = false,
     val isPurgingAll: Boolean = false
 ) {
