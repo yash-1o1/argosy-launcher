@@ -63,6 +63,8 @@ sealed class LaunchConfig {
 sealed class ExtraValue {
     object FilePath : ExtraValue()
     object FileUri : ExtraValue()
+    object FileSchemeUri : ExtraValue()
+    object DocumentUri : ExtraValue()
     object Platform : ExtraValue()
     data class Literal(val value: String) : ExtraValue()
     data class BooleanLiteral(val value: Boolean) : ExtraValue()
@@ -523,6 +525,29 @@ object EmulatorRegistry {
             downloadUrl = "https://play.google.com/store/apps/details?id=bruenor.magicbox"
         ),
 
+        EmulatorDef(
+            id = "ax360e",
+            packageName = "aenu.ax360e",
+            displayName = "AX360E",
+            supportedPlatforms = setOf("xbox360"),
+            launchAction = "aenu.intent.action.AX360E",
+            launchConfig = LaunchConfig.Custom(
+                activityClass = "aenu.ax360e.EmulatorActivity",
+                intentExtras = mapOf("game_uri" to ExtraValue.DocumentUri)
+            )
+        ),
+        EmulatorDef(
+            id = "ax360e_free",
+            packageName = "aenu.ax360e.free",
+            displayName = "AX360E (Free)",
+            supportedPlatforms = setOf("xbox360"),
+            launchAction = "aenu.intent.action.AX360E",
+            launchConfig = LaunchConfig.Custom(
+                activityClass = "aenu.ax360e.EmulatorActivity",
+                intentExtras = mapOf("game_uri" to ExtraValue.DocumentUri)
+            )
+        ),
+
         // Steam launchers
         EmulatorDef(
             id = "gamehub",
@@ -606,6 +631,7 @@ object EmulatorRegistry {
         "ngpc" to listOf("retroarch", "retroarch_64"),
         "wonderswan" to listOf("retroarch", "retroarch_64"),
         "wsc" to listOf("retroarch", "retroarch_64"),
+        "xbox360" to listOf("ax360e", "ax360e_free"),
         "steam" to listOf("gamehub", "gamehub_lite", "gamenative"),
         "c64" to listOf("retroarch", "retroarch_64"),
         "vic20" to listOf("retroarch", "retroarch_64")
@@ -1047,6 +1073,17 @@ object EmulatorRegistry {
                 intentExtras = mapOf("PATH" to ExtraValue.FilePath)
             ),
             downloadUrl = "https://github.com/rafaelvcaetano/melonDS-android/releases/tag/nightly-release"
+        ),
+        EmulatorFamily(
+            baseId = "ax360e",
+            displayNamePrefix = "AX360E",
+            packagePatterns = listOf("aenu.ax360e*"),
+            supportedPlatforms = setOf("xbox360"),
+            launchAction = "aenu.intent.action.AX360E",
+            launchConfig = LaunchConfig.Custom(
+                activityClass = "aenu.ax360e.EmulatorActivity",
+                intentExtras = mapOf("game_uri" to ExtraValue.DocumentUri)
+            )
         ),
         EmulatorFamily(
             baseId = "retroarch",

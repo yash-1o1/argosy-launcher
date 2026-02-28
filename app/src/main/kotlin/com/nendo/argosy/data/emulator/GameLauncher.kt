@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.core.content.FileProvider
 import com.nendo.argosy.data.download.ZipExtractor
 import com.nendo.argosy.data.launcher.SteamLaunchers
@@ -574,9 +575,8 @@ class GameLauncher @Inject constructor(
         config: LaunchConfig.Custom,
         forResume: Boolean
     ): Intent {
-        val needsUriPermission = config.intentExtras.values.any { it is ExtraValue.FilePath || it is ExtraValue.FileUri }
+        val needsUriPermission = config.intentExtras.values.any { it is ExtraValue.FileUri }
 
-        // Pre-grant URI permission to emulator package for Android 11+ Scoped Storage compatibility
         if (needsUriPermission) {
             val uri = getFileUri(romFile)
             try {
@@ -593,7 +593,9 @@ class GameLauncher @Inject constructor(
                 setPackage(emulator.packageName)
             }
 
-            addCategory(Intent.CATEGORY_DEFAULT)
+            if (emulator.launchAction == Intent.ACTION_VIEW || emulator.launchAction == Intent.ACTION_MAIN) {
+                addCategory(Intent.CATEGORY_DEFAULT)
+            }
 
             if (emulator.launchAction == Intent.ACTION_VIEW) {
                 val uri = if (config.useFileUri) {
@@ -619,10 +621,11 @@ class GameLauncher @Inject constructor(
             val shouldSkipExtras = emulator.launchAction == Intent.ACTION_VIEW
             if (!shouldSkipExtras) {
                 config.intentExtras.forEach { (key, extraValue) ->
-                    // Using when as expression enforces compile-time exhaustiveness for sealed class
                     @Suppress("UNUSED_VARIABLE")
                     val handled: Unit = when (extraValue) {
                         is ExtraValue.FilePath -> putExtra(key, romFile.absolutePath)
+                        is ExtraValue.FileSchemeUri -> putExtra(key, Uri.fromFile(romFile).toString())
+                        is ExtraValue.DocumentUri -> putExtra(key, getDocumentUri(romFile).toString())
                         is ExtraValue.FileUri -> {
                             hasFileUri = true
                             putExtra(key, getFileUri(romFile).toString())
@@ -634,15 +637,20 @@ class GameLauncher @Inject constructor(
                 }
             }
 
-            // Include URI in clipData for emulators that may read from it (Android 11+ Scoped Storage)
             if (hasFileUri || needsUriPermission) {
                 val uri = getFileUri(romFile)
-                clipData = ClipData.newRawUri(null, uri)
+                if (emulator.launchAction == Intent.ACTION_VIEW || emulator.launchAction == Intent.ACTION_MAIN) {
+                    clipData = ClipData.newRawUri(null, uri)
+                } else {
+                    data = uri
+                }
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
 
             if (forResume) {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            } else if (emulator.launchAction != Intent.ACTION_VIEW && emulator.launchAction != Intent.ACTION_MAIN) {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             } else {
                 addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or
@@ -850,6 +858,24 @@ class GameLauncher @Inject constructor(
             Logger.warn(TAG, "FileProvider failed for ${file.name}, using file:// URI", e)
             Uri.fromFile(file)
         }
+    }
+
+    private fun getDocumentUri(file: File): Uri {
+        val externalRoot = "/storage/emulated/0/"
+        val path = file.absolutePath
+        val relativePath = if (path.startsWith(externalRoot)) {
+            path.removePrefix(externalRoot)
+        } else {
+            path.removePrefix("/")
+        }
+        val documentId = "primary:$relativePath"
+        val parentDir = file.parentFile?.absolutePath?.removePrefix(externalRoot) ?: relativePath.substringBeforeLast("/")
+        val treeId = "primary:$parentDir"
+        val treeUri = DocumentsContract.buildTreeDocumentUri(
+            "com.android.externalstorage.documents",
+            treeId
+        )
+        return DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
     }
 
     private fun getMimeType(file: File): String {
