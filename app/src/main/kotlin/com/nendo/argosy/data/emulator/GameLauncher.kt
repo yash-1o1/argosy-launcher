@@ -9,6 +9,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import androidx.core.content.FileProvider
 import com.nendo.argosy.data.download.ZipExtractor
+import com.nendo.argosy.data.storage.StoragePathUtils
 import com.nendo.argosy.data.launcher.SteamLaunchers
 import com.nendo.argosy.data.local.dao.EmulatorConfigDao
 import com.nendo.argosy.data.repository.BiosRepository
@@ -593,9 +594,7 @@ class GameLauncher @Inject constructor(
                 setPackage(emulator.packageName)
             }
 
-            if (emulator.launchAction == Intent.ACTION_VIEW || emulator.launchAction == Intent.ACTION_MAIN) {
-                addCategory(Intent.CATEGORY_DEFAULT)
-            }
+            addCategory(Intent.CATEGORY_DEFAULT)
 
             if (emulator.launchAction == Intent.ACTION_VIEW) {
                 val uri = if (config.useFileUri) {
@@ -624,8 +623,10 @@ class GameLauncher @Inject constructor(
                     @Suppress("UNUSED_VARIABLE")
                     val handled: Unit = when (extraValue) {
                         is ExtraValue.FilePath -> putExtra(key, romFile.absolutePath)
-                        is ExtraValue.FileSchemeUri -> putExtra(key, Uri.fromFile(romFile).toString())
-                        is ExtraValue.DocumentUri -> putExtra(key, getDocumentUri(romFile).toString())
+                        is ExtraValue.DocumentUri -> {
+                            val docUri = getDocumentUri(romFile)
+                            if (docUri != null) putExtra(key, docUri.toString()) else Unit
+                        }
                         is ExtraValue.FileUri -> {
                             hasFileUri = true
                             putExtra(key, getFileUri(romFile).toString())
@@ -639,18 +640,12 @@ class GameLauncher @Inject constructor(
 
             if (hasFileUri || needsUriPermission) {
                 val uri = getFileUri(romFile)
-                if (emulator.launchAction == Intent.ACTION_VIEW || emulator.launchAction == Intent.ACTION_MAIN) {
-                    clipData = ClipData.newRawUri(null, uri)
-                } else {
-                    data = uri
-                }
+                clipData = ClipData.newRawUri(null, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
 
             if (forResume) {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            } else if (emulator.launchAction != Intent.ACTION_VIEW && emulator.launchAction != Intent.ACTION_MAIN) {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             } else {
                 addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or
@@ -860,22 +855,18 @@ class GameLauncher @Inject constructor(
         }
     }
 
-    private fun getDocumentUri(file: File): Uri {
-        val externalRoot = "/storage/emulated/0/"
-        val path = file.absolutePath
-        val relativePath = if (path.startsWith(externalRoot)) {
-            path.removePrefix(externalRoot)
-        } else {
-            path.removePrefix("/")
-        }
-        val documentId = "primary:$relativePath"
-        val parentDir = file.parentFile?.absolutePath?.removePrefix(externalRoot) ?: relativePath.substringBeforeLast("/")
-        val treeId = "primary:$parentDir"
+    private fun getDocumentUri(file: File): Uri? {
+        val (volumeId, relativePath) = StoragePathUtils.extractVolumeAndPath(file.absolutePath)
+            ?: run {
+                Logger.warn(TAG, "Cannot build document URI for non-documentable path: ${file.absolutePath}")
+                return null
+            }
+        val parentRelative = relativePath.substringBeforeLast("/", relativePath)
         val treeUri = DocumentsContract.buildTreeDocumentUri(
             "com.android.externalstorage.documents",
-            treeId
+            "$volumeId:$parentRelative"
         )
-        return DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
+        return DocumentsContract.buildDocumentUriUsingTree(treeUri, "$volumeId:$relativePath")
     }
 
     private fun getMimeType(file: File): String {

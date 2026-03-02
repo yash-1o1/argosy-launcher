@@ -63,7 +63,6 @@ sealed class LaunchConfig {
 sealed class ExtraValue {
     object FilePath : ExtraValue()
     object FileUri : ExtraValue()
-    object FileSchemeUri : ExtraValue()
     object DocumentUri : ExtraValue()
     object Platform : ExtraValue()
     data class Literal(val value: String) : ExtraValue()

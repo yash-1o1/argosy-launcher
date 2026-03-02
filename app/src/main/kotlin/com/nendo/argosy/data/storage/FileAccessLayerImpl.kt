@@ -1,7 +1,7 @@
 package com.nendo.argosy.data.storage
 
 import android.content.Context
-import android.os.Environment
+
 import com.nendo.argosy.util.Logger
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -282,22 +282,7 @@ class FileAccessLayerImpl @Inject constructor(
     }
 
     private fun extractVolumeAndPath(path: String): Pair<String, String>? {
-        val primaryRoot = Environment.getExternalStorageDirectory().absolutePath
-        val sdcardPattern = Regex("^/storage/([A-F0-9-]+)")
-
-        return when {
-            path.startsWith(primaryRoot) -> {
-                "primary" to path.removePrefix(primaryRoot).trimStart('/')
-            }
-            path.matches(Regex("^/storage/[A-F0-9-]+.*")) -> {
-                val match = sdcardPattern.find(path)
-                if (match != null) {
-                    val volId = match.groupValues[1]
-                    volId to path.removePrefix("/storage/$volId").trimStart('/')
-                } else null
-            }
-            else -> null
-        }
+        return StoragePathUtils.extractVolumeAndPath(path)
     }
 
     private fun File.toFileInfo(): FileInfo = FileInfo(
