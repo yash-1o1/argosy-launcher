@@ -42,6 +42,7 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
 import java.io.IOException
+import java.text.Normalizer
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -419,9 +420,9 @@ class SaveSyncApiClient @Inject constructor(
 
             val latestServerSave = if (channelName != null) {
                 serverSaves
-                    .filter { it.slot == channelName }
+                    .filter { it.slot != null && equalsNormalized(it.slot, channelName) }
                     .maxByOrNull { parseTimestamp(it.updatedAt) }
-                    ?: serverSaves.find { File(it.fileName).nameWithoutExtension.equals(channelName, ignoreCase = true) }
+                    ?: serverSaves.find { equalsNormalized(File(it.fileName).nameWithoutExtension, channelName) }
             } else {
                 val candidates = serverSaves.filter { isLatestSaveFileName(it.fileName, romBaseName) }
                 if (isGciBundle && candidates.size > 1) {
@@ -436,10 +437,10 @@ class SaveSyncApiClient @Inject constructor(
                 val candidates = serverSaves.filter { serverSave ->
                     val baseName = File(serverSave.fileName).nameWithoutExtension
                     if (channelName != null) {
-                        baseName.equals(channelName, ignoreCase = true)
+                        equalsNormalized(baseName, channelName)
                     } else {
                         baseName.equals(DEFAULT_SAVE_NAME, ignoreCase = true) ||
-                            romBaseName != null && baseName.equals(romBaseName, ignoreCase = true)
+                            romBaseName != null && equalsNormalized(baseName, romBaseName)
                     }
                 }
                 if (isGciBundle && candidates.size > 1) {
@@ -609,7 +610,7 @@ class SaveSyncApiClient @Inject constructor(
             if (sessionOnOlderSave[gameId] == true) {
                 val serverSaves = checkSavesForGame(gameId, rommId)
                 val latestForSlot = serverSaves
-                    .filter { it.slot == channelName }
+                    .filter { it.slot != null && equalsNormalized(it.slot, channelName) }
                     .maxByOrNull { parseTimestamp(it.updatedAt) }
                 val serverTime = latestForSlot?.let { parseTimestamp(it.updatedAt) } ?: Instant.now()
                 val localTime = Instant.ofEpochMilli(cacheFile.lastModified())
@@ -650,7 +651,7 @@ class SaveSyncApiClient @Inject constructor(
             if (response.code() == 409) {
                 val conflictSaves = try { checkSavesForGame(gameId, rommId) } catch (_: Exception) { emptyList() }
                 val conflictSlotSave = conflictSaves
-                    .filter { it.slot == channelName }
+                    .filter { it.slot != null && equalsNormalized(it.slot, channelName) }
                     .maxByOrNull { parseTimestamp(it.updatedAt) }
                 val serverTime = conflictSlotSave?.let { parseTimestamp(it.updatedAt) } ?: Instant.now()
                 val localTime = Instant.ofEpochMilli(cacheFile.lastModified())
@@ -1537,52 +1538,6 @@ class SaveSyncApiClient @Inject constructor(
         }
     }
 
-    internal fun parseTimestamp(timestamp: String): Instant {
-        return try {
-            Instant.parse(timestamp)
-        } catch (_: Exception) {
-            try {
-                java.time.OffsetDateTime.parse(timestamp).toInstant()
-            } catch (_: Exception) {
-                try {
-                    java.time.ZonedDateTime.parse(timestamp).toInstant()
-                } catch (_: Exception) {
-                    Logger.warn(TAG, "Failed to parse timestamp: $timestamp, using current time")
-                    Instant.now()
-                }
-            }
-        }
-    }
-
-    internal fun parseServerChannelName(fileName: String): String? {
-        val baseName = File(fileName).nameWithoutExtension
-        if (isTimestampSaveName(baseName)) return null
-        return baseName
-    }
-
-    internal fun parseServerChannelNameForSync(fileName: String, romBaseName: String?): String? {
-        val baseName = File(fileName).nameWithoutExtension
-        if (isTimestampSaveName(baseName)) return null
-        if (isLatestSaveFileName(fileName, romBaseName)) return null
-        return baseName
-    }
-
-    internal fun isLatestSaveFileName(fileName: String, romBaseName: String?): Boolean {
-        val baseName = File(fileName).nameWithoutExtension
-        if (baseName.equals(DEFAULT_SAVE_NAME, ignoreCase = true)) return true
-        if (romBaseName == null) return false
-        if (baseName.equals(romBaseName, ignoreCase = true)) return true
-        if (baseName.startsWith(romBaseName, ignoreCase = true)) {
-            val suffix = baseName.drop(romBaseName.length).trim()
-            if (suffix.isEmpty()) return true
-            if (ROMM_TIMESTAMP_TAG.matches(suffix)) return true
-        }
-        return false
-    }
-
-    private fun isTimestampSaveName(baseName: String): Boolean {
-        return TIMESTAMP_ONLY_PATTERN.matches(baseName)
-    }
 
     internal val sessionOnOlderSave = mutableMapOf<Long, Boolean>()
 
@@ -1611,9 +1566,75 @@ class SaveSyncApiClient @Inject constructor(
         internal const val MIN_VALID_SAVE_SIZE_BYTES = 100L
         internal const val AUTOCLEANUP_LIMIT = 10
         internal val TIMESTAMP_ONLY_PATTERN = Regex("""^\d{4}-\d{2}-\d{2}[_-]\d{2}[_-]\d{2}[_-]\d{2}$""")
-        internal val ROMM_TIMESTAMP_TAG = Regex("""^\[\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2}(-\d+)?\]$""")
+        internal val ROMM_TIMESTAMP_TAG = Regex("""^\[\d{4}-\d{2}-\d{2}[ _]\d{2}-\d{2}-\d{2}(-\d+)?\]$""")
         internal val SWITCH_EMULATOR_IDS = setOf(
             "yuzu", "ryujinx", "citron", "strato", "eden", "sudachi", "skyline"
         )
+
+        private val DIACRITICS_PATTERN = Regex("\\p{InCombiningDiacriticalMarks}+")
+
+        internal fun stripAccents(s: String): String =
+            DIACRITICS_PATTERN.replace(Normalizer.normalize(s, Normalizer.Form.NFD), "")
+
+        internal fun equalsNormalized(a: String, b: String): Boolean =
+            stripAccents(a).equals(stripAccents(b), ignoreCase = true)
+
+        internal fun startsWithNormalized(text: String, prefix: String): Boolean =
+            stripAccents(text).startsWith(stripAccents(prefix), ignoreCase = true)
+
+        internal fun dropPrefixNormalized(text: String, prefix: String): String {
+            val stripped = stripAccents(text)
+            val strippedPrefix = stripAccents(prefix)
+            return if (stripped.startsWith(strippedPrefix, ignoreCase = true)) {
+                text.drop(prefix.length)
+            } else text
+        }
+
+        internal fun parseTimestamp(timestamp: String): Instant {
+            return try {
+                Instant.parse(timestamp)
+            } catch (_: Exception) {
+                try {
+                    java.time.OffsetDateTime.parse(timestamp).toInstant()
+                } catch (_: Exception) {
+                    try {
+                        java.time.ZonedDateTime.parse(timestamp).toInstant()
+                    } catch (_: Exception) {
+                        Logger.warn(TAG, "Failed to parse timestamp: $timestamp, using current time")
+                        Instant.now()
+                    }
+                }
+            }
+        }
+
+        internal fun parseServerChannelName(fileName: String): String? {
+            val baseName = File(fileName).nameWithoutExtension
+            if (isTimestampSaveName(baseName)) return null
+            return baseName
+        }
+
+        internal fun parseServerChannelNameForSync(fileName: String, romBaseName: String?): String? {
+            val baseName = File(fileName).nameWithoutExtension
+            if (isTimestampSaveName(baseName)) return null
+            if (isLatestSaveFileName(fileName, romBaseName)) return null
+            return baseName
+        }
+
+        internal fun isLatestSaveFileName(fileName: String, romBaseName: String?): Boolean {
+            val baseName = File(fileName).nameWithoutExtension
+            if (baseName.equals(DEFAULT_SAVE_NAME, ignoreCase = true)) return true
+            if (romBaseName == null) return false
+            if (equalsNormalized(baseName, romBaseName)) return true
+            if (startsWithNormalized(baseName, romBaseName)) {
+                val suffix = dropPrefixNormalized(baseName, romBaseName).trim()
+                if (suffix.isEmpty()) return true
+                if (ROMM_TIMESTAMP_TAG.matches(suffix)) return true
+            }
+            return false
+        }
+
+        internal fun isTimestampSaveName(baseName: String): Boolean {
+            return TIMESTAMP_ONLY_PATTERN.matches(baseName)
+        }
     }
 }

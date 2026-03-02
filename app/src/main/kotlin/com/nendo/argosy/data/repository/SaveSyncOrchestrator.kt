@@ -203,8 +203,8 @@ class SaveSyncOrchestrator @Inject constructor(
         val romBaseName = game.localPath?.let { File(it).nameWithoutExtension }
 
         for (serverSave in serverSaves) {
-            val channelName = client.parseServerChannelNameForSync(serverSave.fileName, romBaseName)
-            val serverTime = client.parseTimestamp(serverSave.updatedAt)
+            val channelName = SaveSyncApiClient.parseServerChannelNameForSync(serverSave.fileName, romBaseName)
+            val serverTime = SaveSyncApiClient.parseTimestamp(serverSave.updatedAt)
 
             saveSyncDao.upsert(
                 SaveSyncEntity(

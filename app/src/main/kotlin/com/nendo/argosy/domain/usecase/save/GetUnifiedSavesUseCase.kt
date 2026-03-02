@@ -4,6 +4,8 @@ import com.nendo.argosy.data.local.dao.GameDao
 import com.nendo.argosy.data.local.entity.SaveCacheEntity
 import com.nendo.argosy.data.remote.romm.RomMSave
 import com.nendo.argosy.data.repository.SaveCacheManager
+import com.nendo.argosy.data.repository.SaveSyncApiClient
+import com.nendo.argosy.data.repository.SaveSyncApiClient.Companion.equalsNormalized
 import com.nendo.argosy.data.repository.SaveSyncRepository
 import com.nendo.argosy.domain.model.UnifiedSaveEntry
 import java.io.File
@@ -83,7 +85,7 @@ class GetUnifiedSavesUseCase @Inject constructor(
                 usedServerIds.add(matchingServer.id)
                 val isLatest = isLatestSlot(matchingServer.slot, matchingServer.fileName, romBaseName)
                 val serverChannelName = if (isLatest) null
-                    else matchingServer.slot ?: parseServerChannelName(matchingServer.fileName, romBaseName)
+                    else matchingServer.slot ?: SaveSyncApiClient.parseServerChannelNameForSync(matchingServer.fileName, romBaseName)
                 val mergedChannelName = channelName ?: serverChannelName
                 val isLocked = mergedChannelName != null || cache.isLocked
                 val deviceSyncCurrent = saveSyncRepository.getDeviceId()?.let { devId ->
@@ -132,7 +134,7 @@ class GetUnifiedSavesUseCase @Inject constructor(
             val timestamp = parseServerTimestamp(serverSave.updatedAt) ?: Instant.now()
             val isLatest = isLatestSlot(serverSave.slot, serverSave.fileName, romBaseName)
             val serverChannelName = if (isLatest) null
-                else serverSave.slot ?: parseServerChannelName(serverSave.fileName, romBaseName)
+                else serverSave.slot ?: SaveSyncApiClient.parseServerChannelNameForSync(serverSave.fileName, romBaseName)
             val isLocked = serverChannelName != null
             val deviceSyncCurrent = saveSyncRepository.getDeviceId()?.let { devId ->
                 serverSave.deviceSyncs?.find { it.deviceId == devId }?.isCurrent
@@ -162,46 +164,17 @@ class GetUnifiedSavesUseCase @Inject constructor(
         romBaseName: String?
     ): Boolean {
         if (channelName != null) {
-            if (serverSave.slot != null) return serverSave.slot.equals(channelName, ignoreCase = true)
+            if (serverSave.slot != null) return equalsNormalized(serverSave.slot, channelName)
             val serverBaseName = File(serverSave.fileName).nameWithoutExtension
-            return channelName.equals(serverBaseName, ignoreCase = true)
+            return equalsNormalized(channelName, serverBaseName)
         }
-        if (serverSave.slot != null) return isLatestName(serverSave.slot, romBaseName)
-        val serverBaseName = File(serverSave.fileName).nameWithoutExtension
-        return isLatestName(serverBaseName, romBaseName)
-    }
-
-    private fun isTimestampSaveName(baseName: String): Boolean {
-        return TIMESTAMP_ONLY_PATTERN.matches(baseName)
-    }
-
-    private fun parseServerChannelName(fileName: String, romBaseName: String?): String? {
-        val baseName = File(fileName).nameWithoutExtension
-        if (isTimestampSaveName(baseName)) return null
-        if (isLatestName(baseName, romBaseName)) return null
-        return baseName
-    }
-
-    private fun isLatestName(baseName: String, romBaseName: String?): Boolean {
-        if (baseName.equals(DEFAULT_SAVE_NAME, ignoreCase = true)) return true
-        if (romBaseName == null) return false
-        if (baseName.equals(romBaseName, ignoreCase = true)) return true
-        if (baseName.startsWith(romBaseName, ignoreCase = true)) {
-            val suffix = baseName.drop(romBaseName.length).trim()
-            if (suffix.isEmpty()) return true
-            if (ROMM_TIMESTAMP_TAG.matches(suffix)) return true
-        }
-        return false
+        if (serverSave.slot != null) return SaveSyncApiClient.isLatestSaveFileName(serverSave.slot, romBaseName)
+        return SaveSyncApiClient.isLatestSaveFileName(serverSave.fileName, romBaseName)
     }
 
     private fun isLatestSlot(slot: String?, fileName: String, romBaseName: String?): Boolean {
-        if (slot != null) return isLatestName(slot, romBaseName)
-        return isLatestFileName(fileName, romBaseName)
-    }
-
-    private fun isLatestFileName(fileName: String, romBaseName: String?): Boolean {
-        val baseName = File(fileName).nameWithoutExtension
-        return isLatestName(baseName, romBaseName)
+        if (slot != null) return SaveSyncApiClient.isLatestSaveFileName(slot, romBaseName)
+        return SaveSyncApiClient.isLatestSaveFileName(fileName, romBaseName)
     }
 
     private fun sortEntries(entries: List<UnifiedSaveEntry>): List<UnifiedSaveEntry> {
@@ -227,9 +200,4 @@ class GetUnifiedSavesUseCase @Inject constructor(
         }
     }
 
-    companion object {
-        private const val DEFAULT_SAVE_NAME = "argosy-latest"
-        private val TIMESTAMP_ONLY_PATTERN = Regex("""^\d{4}-\d{2}-\d{2}[_-]\d{2}[_-]\d{2}[_-]\d{2}$""")
-        private val ROMM_TIMESTAMP_TAG = Regex("""^\[\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2}(-\d+)?\]$""")
-    }
 }

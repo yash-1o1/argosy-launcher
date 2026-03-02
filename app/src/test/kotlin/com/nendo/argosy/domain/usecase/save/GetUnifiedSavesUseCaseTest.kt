@@ -4,6 +4,7 @@ import com.nendo.argosy.data.local.dao.GameDao
 import com.nendo.argosy.data.local.entity.GameEntity
 import com.nendo.argosy.data.local.entity.SaveCacheEntity
 import com.nendo.argosy.data.model.GameSource
+import com.nendo.argosy.data.remote.romm.RomMDeviceSync
 import com.nendo.argosy.data.remote.romm.RomMSave
 import com.nendo.argosy.data.repository.SaveCacheManager
 import com.nendo.argosy.data.repository.SaveSyncRepository
@@ -13,6 +14,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -390,6 +392,186 @@ class GetUnifiedSavesUseCaseTest {
         assertEquals(Source.LOCAL, entries[0].source)
     }
 
+    // --- Unicode merging tests ---
+
+    private val accentGameId = 2L
+    private val accentRommId = 200L
+    private val accentRomBaseName = "Pokemon Violet"
+    private val accentLocalPath = "/storage/roms/switch/$accentRomBaseName.nsp"
+    private val accentGame = GameEntity(
+        id = accentGameId,
+        platformId = 2L,
+        title = "Pokemon Violet",
+        sortTitle = "pokemon violet",
+        localPath = accentLocalPath,
+        rommId = accentRommId,
+        igdbId = null,
+        source = GameSource.ROMM_SYNCED
+    )
+
+    private fun setupAccentMocks(
+        localCaches: List<SaveCacheEntity>,
+        serverSaves: List<RomMSave>
+    ) {
+        coEvery { gameDao.getById(accentGameId) } returns accentGame
+        coEvery { saveCacheManager.getCachesForGameOnce(accentGameId) } returns localCaches
+        coEvery { saveSyncRepository.checkSavesForGame(accentGameId, accentRommId) } returns serverSaves
+    }
+
+    @Test
+    fun `server save with accented filename treated as latest not channel`() = runTest {
+        val serverSave = createAccentServerSave(id = 1, fileName = "Pok\u00e9mon Violet.srm")
+        setupAccentMocks(localCaches = emptyList(), serverSaves = listOf(serverSave))
+
+        val entries = useCase(accentGameId)
+
+        assertEquals(1, entries.size)
+        assertTrue(entries[0].isLatest)
+        assertNull(entries[0].channelName)
+        assertFalse(entries[0].isLocked)
+    }
+
+    @Test
+    fun `accented server save merges with local latest cache as BOTH`() = runTest {
+        val localCache = createAccentLocalCache(id = 1, note = null, isLocked = false)
+        val serverSave = createAccentServerSave(id = 10, fileName = "Pok\u00e9mon Violet.srm")
+        setupAccentMocks(localCaches = listOf(localCache), serverSaves = listOf(serverSave))
+
+        val entries = useCase(accentGameId)
+
+        assertEquals(1, entries.size)
+        assertEquals(Source.BOTH, entries[0].source)
+        assertNull(entries[0].channelName)
+    }
+
+    @Test
+    fun `accented server slot matches local channel name`() = runTest {
+        val localCache = createAccentLocalCache(id = 1, note = "checkpoint", isLocked = true)
+        val serverSave = createAccentServerSave(
+            id = 10,
+            fileName = "Ch\u00e9ckpoint.srm",
+            slot = "Ch\u00e9ckpoint"
+        )
+        setupAccentMocks(localCaches = listOf(localCache), serverSaves = listOf(serverSave))
+
+        val entries = useCase(accentGameId)
+
+        assertEquals(1, entries.size)
+        assertEquals(Source.BOTH, entries[0].source)
+    }
+
+    @Test
+    fun `mixed accented latest and plain channel saves correctly categorized`() = runTest {
+        val latestSave = createAccentServerSave(id = 1, fileName = "Pok\u00e9mon Violet.srm")
+        val channelSave = createAccentServerSave(id = 2, fileName = "checkpoint.srm")
+        setupAccentMocks(localCaches = emptyList(), serverSaves = listOf(latestSave, channelSave))
+
+        val entries = useCase(accentGameId)
+
+        assertEquals(2, entries.size)
+        val latest = entries.find { it.isLatest }
+        val channel = entries.find { it.channelName == "checkpoint" }
+        assertNotNull(latest)
+        assertNull(latest!!.channelName)
+        assertNotNull(channel)
+        assertTrue(channel!!.isLocked)
+    }
+
+    @Test
+    fun `accented filename with RomM timestamp tag treated as latest`() = runTest {
+        val serverSave = createAccentServerSave(
+            id = 1,
+            fileName = "Pok\u00e9mon Violet [2024-01-15 12-00-00].srm"
+        )
+        setupAccentMocks(localCaches = emptyList(), serverSaves = listOf(serverSave))
+
+        val entries = useCase(accentGameId)
+
+        assertEquals(1, entries.size)
+        assertTrue(entries[0].isLatest)
+        assertNull(entries[0].channelName)
+    }
+
+    // --- Device sync display tests ---
+
+    @Test
+    fun `server-only save with device is_current true shows isCurrent`() = runTest {
+        coEvery { saveSyncRepository.getDeviceId() } returns "device-1"
+        val serverSave = createServerSave(id = 1, fileName = "checkpoint.srm").copy(
+            deviceSyncs = listOf(RomMDeviceSync(deviceId = "device-1", isCurrent = true))
+        )
+        setupMocks(localCaches = emptyList(), serverSaves = listOf(serverSave))
+
+        val entries = useCase(gameId)
+
+        assertEquals(1, entries.size)
+        assertTrue(entries[0].isCurrent)
+    }
+
+    @Test
+    fun `server-only save with device is_current false shows not current`() = runTest {
+        coEvery { saveSyncRepository.getDeviceId() } returns "device-1"
+        val serverSave = createServerSave(id = 1, fileName = "checkpoint.srm").copy(
+            deviceSyncs = listOf(RomMDeviceSync(deviceId = "device-1", isCurrent = false))
+        )
+        setupMocks(localCaches = emptyList(), serverSaves = listOf(serverSave))
+
+        val entries = useCase(gameId)
+
+        assertEquals(1, entries.size)
+        assertFalse(entries[0].isCurrent)
+    }
+
+    @Test
+    fun `merged BOTH entry preserves device sync isCurrent`() = runTest {
+        coEvery { saveSyncRepository.getDeviceId() } returns "device-1"
+        val localCache = createLocalCache(id = 1, note = "checkpoint", isLocked = true)
+        val serverSave = createServerSave(id = 10, fileName = "checkpoint.srm").copy(
+            deviceSyncs = listOf(RomMDeviceSync(deviceId = "device-1", isCurrent = true))
+        )
+        setupMocks(localCaches = listOf(localCache), serverSaves = listOf(serverSave))
+
+        val entries = useCase(gameId)
+
+        assertEquals(1, entries.size)
+        assertEquals(Source.BOTH, entries[0].source)
+        assertTrue(entries[0].isCurrent)
+    }
+
+    // --- rommSaveId matching priority tests ---
+
+    @Test
+    fun `cache with rommSaveId matches server by ID not name`() = runTest {
+        val localCache = createLocalCache(id = 1, note = "old-name", isLocked = true).copy(
+            rommSaveId = 10L
+        )
+        val serverSave = createServerSave(id = 10, fileName = "new-name.srm")
+        setupMocks(localCaches = listOf(localCache), serverSaves = listOf(serverSave))
+
+        val entries = useCase(gameId)
+
+        val bothEntries = entries.filter { it.source == Source.BOTH }
+        assertEquals(1, bothEntries.size)
+        assertEquals(1L, bothEntries[0].localCacheId)
+        assertEquals(10L, bothEntries[0].serverSaveId)
+    }
+
+    @Test
+    fun `cache without rommSaveId falls back to name matching`() = runTest {
+        val localCache = createLocalCache(id = 1, note = "checkpoint", isLocked = true)
+        val serverSave = createServerSave(id = 10, fileName = "checkpoint.srm")
+        setupMocks(localCaches = listOf(localCache), serverSaves = listOf(serverSave))
+
+        val entries = useCase(gameId)
+
+        val bothEntries = entries.filter { it.source == Source.BOTH }
+        assertEquals(1, bothEntries.size)
+        assertEquals(1L, bothEntries[0].localCacheId)
+        assertEquals(10L, bothEntries[0].serverSaveId)
+    }
+
+    // --- helpers ---
+
     private fun setupMocks(
         localCaches: List<SaveCacheEntity>,
         serverSaves: List<RomMSave>
@@ -428,5 +610,38 @@ class GetUnifiedSavesUseCaseTest {
         fileName = fileName,
         fileSizeBytes = 8192,
         updatedAt = updatedAt
+    )
+
+    private fun createAccentLocalCache(
+        id: Long,
+        note: String?,
+        isLocked: Boolean,
+        cachedAt: Instant = Instant.now()
+    ) = SaveCacheEntity(
+        id = id,
+        gameId = accentGameId,
+        emulatorId = "yuzu",
+        cachedAt = cachedAt,
+        saveSize = 65536,
+        cachePath = "$accentGameId/${cachedAt.epochSecond}/save.srm",
+        note = note,
+        channelName = note,
+        isLocked = isLocked
+    )
+
+    private fun createAccentServerSave(
+        id: Long,
+        fileName: String,
+        updatedAt: String = "2024-01-15T12:00:00Z",
+        slot: String? = null
+    ) = RomMSave(
+        id = id,
+        romId = accentRommId,
+        userId = 1,
+        emulator = "yuzu",
+        fileName = fileName,
+        fileSizeBytes = 65536,
+        updatedAt = updatedAt,
+        slot = slot
     )
 }
