@@ -2,7 +2,10 @@ package com.nendo.argosy.data.emulator
 
 import com.nendo.argosy.util.AesXts
 import com.nendo.argosy.util.Logger
+import com.github.luben.zstd.ZstdInputStream
+import java.io.BufferedInputStream
 import java.io.File
+import java.io.FileInputStream
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -350,6 +353,11 @@ class TitleIdExtractor @Inject constructor(
             extract3DSTitleIdFromBinary(romFile)?.let { return it }
         }
 
+        // .z3ds and .zcci are zstd-compressed variants
+        if (ext == "z3ds" || ext == "zcci") {
+            extract3DSTitleIdFromZstd(romFile)?.let { return it }
+        }
+
         val filename = romFile.nameWithoutExtension
 
         // Full title ID pattern: [00040000001B5000] - 16 hex characters
@@ -411,6 +419,42 @@ class TitleIdExtractor @Inject constructor(
             }
         } catch (e: Exception) {
             Logger.warn(TAG, "[SaveSync] DETECT | Failed to read 3DS binary | file=${romFile.name}", e)
+            null
+        }
+    }
+
+    private fun extract3DSTitleIdFromZstd(romFile: File): String? {
+        val ncchOffset = 0x4000
+        val programIdOffset = 0x118
+        val absoluteOffset = ncchOffset + programIdOffset
+        val bytesNeeded = absoluteOffset + 8
+
+        return try {
+            ZstdInputStream(BufferedInputStream(FileInputStream(romFile))).use { zstd ->
+                val buf = ByteArray(bytesNeeded)
+                var read = 0
+                while (read < bytesNeeded) {
+                    val n = zstd.read(buf, read, bytesNeeded - read)
+                    if (n < 0) {
+                        Logger.debug(TAG, "[SaveSync] DETECT | zstd 3DS stream ended early | file=${romFile.name}, read=$read, needed=$bytesNeeded")
+                        return null
+                    }
+                    read += n
+                }
+
+                val bytes = buf.copyOfRange(absoluteOffset, absoluteOffset + 8)
+                val titleId = bytes.reversed().joinToString("") { "%02X".format(it) }
+
+                if (!isValid3DSTitleId(titleId)) {
+                    Logger.debug(TAG, "[SaveSync] DETECT | zstd 3DS binary title ID invalid | file=${romFile.name}, raw=$titleId")
+                    return null
+                }
+
+                Logger.debug(TAG, "[SaveSync] DETECT | 3DS title ID from zstd binary | file=${romFile.name}, titleId=$titleId")
+                titleId
+            }
+        } catch (e: Exception) {
+            Logger.warn(TAG, "[SaveSync] DETECT | Failed to read zstd 3DS binary | file=${romFile.name}", e)
             null
         }
     }
