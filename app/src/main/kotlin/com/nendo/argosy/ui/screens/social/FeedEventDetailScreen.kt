@@ -94,7 +94,8 @@ data class FeedEventDetailUiState(
     val isLoading: Boolean = true,
     val focusedCommentIndex: Int = -1,
     val commentText: String = "",
-    val isCommentInputFocused: Boolean = false
+    val isCommentInputFocused: Boolean = false,
+    val scrollToCommentInput: Boolean = false
 ) {
     val focusedComment: FeedComment?
         get() = comments.getOrNull(focusedCommentIndex)
@@ -166,7 +167,17 @@ class FeedEventDetailViewModel @Inject constructor(
     }
 
     fun focusCommentInput() {
-        _uiState.value = _uiState.value.copy(isCommentInputFocused = true)
+        _uiState.value = _uiState.value.copy(
+            scrollToCommentInput = true,
+            focusedCommentIndex = -1
+        )
+    }
+
+    fun onCommentInputScrolled() {
+        _uiState.value = _uiState.value.copy(
+            scrollToCommentInput = false,
+            isCommentInputFocused = true
+        )
     }
 
     fun unfocusCommentInput() {
@@ -260,7 +271,6 @@ fun FeedEventDetailScreen(
 
     LaunchedEffect(uiState.isCommentInputFocused) {
         if (uiState.isCommentInputFocused) {
-            commentFocusRequester.requestFocus()
             keyboardController?.show()
         } else {
             keyboardController?.hide()
@@ -288,9 +298,11 @@ fun FeedEventDetailScreen(
                                 focusedCommentIndex = uiState.focusedCommentIndex,
                                 commentText = uiState.commentText,
                                 isCommentInputFocused = uiState.isCommentInputFocused,
+                                scrollToCommentInput = uiState.scrollToCommentInput,
                                 commentFocusRequester = commentFocusRequester,
                                 onCommentTextChange = viewModel::updateCommentText,
-                                onSubmitComment = viewModel::submitComment
+                                onSubmitComment = viewModel::submitComment,
+                                onCommentInputScrolled = viewModel::onCommentInputScrolled
                             )
                         } else {
                             PortraitLayout(
@@ -299,9 +311,11 @@ fun FeedEventDetailScreen(
                                 focusedCommentIndex = uiState.focusedCommentIndex,
                                 commentText = uiState.commentText,
                                 isCommentInputFocused = uiState.isCommentInputFocused,
+                                scrollToCommentInput = uiState.scrollToCommentInput,
                                 commentFocusRequester = commentFocusRequester,
                                 onCommentTextChange = viewModel::updateCommentText,
-                                onSubmitComment = viewModel::submitComment
+                                onSubmitComment = viewModel::submitComment,
+                                onCommentInputScrolled = viewModel::onCommentInputScrolled
                             )
                         }
                     }
@@ -327,9 +341,11 @@ private fun LandscapeLayout(
     focusedCommentIndex: Int,
     commentText: String,
     isCommentInputFocused: Boolean,
+    scrollToCommentInput: Boolean,
     commentFocusRequester: FocusRequester,
     onCommentTextChange: (String) -> Unit,
-    onSubmitComment: () -> Unit
+    onSubmitComment: () -> Unit,
+    onCommentInputScrolled: () -> Unit
 ) {
     val isDoodle = event.eventType == FeedEventType.DOODLE
     val mediaWeight = if (isDoodle) 0.5f else 0.4f
@@ -362,9 +378,11 @@ private fun LandscapeLayout(
                 focusedCommentIndex = focusedCommentIndex,
                 commentText = commentText,
                 isCommentInputFocused = isCommentInputFocused,
+                scrollToCommentInput = scrollToCommentInput,
                 commentFocusRequester = commentFocusRequester,
                 onCommentTextChange = onCommentTextChange,
                 onSubmitComment = onSubmitComment,
+                onCommentInputScrolled = onCommentInputScrolled,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -378,12 +396,22 @@ private fun PortraitLayout(
     focusedCommentIndex: Int,
     commentText: String,
     isCommentInputFocused: Boolean,
+    scrollToCommentInput: Boolean,
     commentFocusRequester: FocusRequester,
     onCommentTextChange: (String) -> Unit,
-    onSubmitComment: () -> Unit
+    onSubmitComment: () -> Unit,
+    onCommentInputScrolled: () -> Unit
 ) {
     val listState = rememberLazyListState()
     val headerItemCount = 4
+    val commentInputIndex = 3
+
+    LaunchedEffect(scrollToCommentInput) {
+        if (scrollToCommentInput) {
+            listState.animateScrollToItem(commentInputIndex)
+            onCommentInputScrolled()
+        }
+    }
 
     LaunchedEffect(focusedCommentIndex) {
         if (focusedCommentIndex >= 0) {
@@ -663,12 +691,22 @@ private fun CommentsSection(
     focusedCommentIndex: Int,
     commentText: String,
     isCommentInputFocused: Boolean,
+    scrollToCommentInput: Boolean,
     commentFocusRequester: FocusRequester,
     onCommentTextChange: (String) -> Unit,
     onSubmitComment: () -> Unit,
+    onCommentInputScrolled: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
+    val commentInputIndex = 1
+
+    LaunchedEffect(scrollToCommentInput) {
+        if (scrollToCommentInput) {
+            listState.animateScrollToItem(commentInputIndex)
+            onCommentInputScrolled()
+        }
+    }
 
     LaunchedEffect(focusedCommentIndex) {
         if (focusedCommentIndex >= 0) {
@@ -739,6 +777,12 @@ private fun CommentInput(
     onCommentTextChange: (String) -> Unit,
     onSubmitComment: () -> Unit
 ) {
+    LaunchedEffect(isCommentInputFocused) {
+        if (isCommentInputFocused) {
+            commentFocusRequester.requestFocus()
+        }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
