@@ -27,6 +27,7 @@ import com.nendo.argosy.data.sync.platform.RetroArchSaveHandler
 import com.nendo.argosy.data.sync.platform.SaveContext
 import com.nendo.argosy.data.sync.platform.SwitchSaveHandler
 import com.nendo.argosy.data.sync.platform.VitaSaveHandler
+import com.nendo.argosy.data.sync.platform.WiiSaveHandler
 import com.nendo.argosy.data.sync.platform.WiiUSaveHandler
 import com.nendo.argosy.data.preferences.UserPreferencesRepository
 import com.nendo.argosy.data.titledb.TitleDbRepository
@@ -65,6 +66,7 @@ class SaveSyncApiClient @Inject constructor(
     private val n3dsSaveHandler: N3dsSaveHandler,
     private val vitaSaveHandler: VitaSaveHandler,
     private val pspSaveHandler: PspSaveHandler,
+    private val wiiSaveHandler: WiiSaveHandler,
     private val wiiUSaveHandler: WiiUSaveHandler,
     private val retroArchSaveHandler: RetroArchSaveHandler,
     private val defaultSaveHandler: DefaultSaveHandler
@@ -96,6 +98,7 @@ class SaveSyncApiClient @Inject constructor(
             platformSlug == "3ds" -> n3dsSaveHandler
             platformSlug in listOf("vita", "psvita") -> vitaSaveHandler
             platformSlug == "psp" -> pspSaveHandler
+            platformSlug == "wii" -> wiiSaveHandler
             platformSlug == "wiiu" -> wiiUSaveHandler
             else -> defaultSaveHandler
         }
