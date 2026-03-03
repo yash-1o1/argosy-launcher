@@ -39,6 +39,13 @@ class LaunchViewModel @Inject constructor(
     private val _launchIntent = MutableStateFlow<Intent?>(null)
     val launchIntent: StateFlow<Intent?> = _launchIntent.asStateFlow()
 
+    private var hasLaunchedEmulator = false
+        private set
+
+    fun resetLaunchState() {
+        hasLaunchedEmulator = false
+    }
+
     private val _launchOptions = MutableStateFlow<Bundle?>(null)
     val launchOptions: StateFlow<Bundle?> = _launchOptions.asStateFlow()
 
@@ -64,6 +71,7 @@ class LaunchViewModel @Inject constructor(
                 discId = discId,
                 channelName = channelName,
                 onLaunch = { intent ->
+                    hasLaunchedEmulator = true
                     _launchOptions.value = options
                     _launchIntent.value = intent
                 }
@@ -72,6 +80,7 @@ class LaunchViewModel @Inject constructor(
     }
 
     fun handleSessionEnd(onComplete: () -> Unit) {
+        if (!hasLaunchedEmulator) return
         gameLaunchDelegate.handleSessionEnd(
             scope = viewModelScope,
             onSyncComplete = {

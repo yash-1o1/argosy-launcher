@@ -413,6 +413,7 @@ class GameLaunchDelegate @Inject constructor(
                 }
                 android.util.Log.d("GameLaunchDelegate", "handleSessionEnd: flash return (${seconds}s), keeping session alive")
                 playSessionTracker.markFlashReturn()
+                onSyncComplete()
                 return
             }
 
@@ -451,6 +452,7 @@ class GameLaunchDelegate @Inject constructor(
                     )
                 ) {
                     playSessionTracker.endSession()
+                    onSyncComplete()
                     return@launch
                 }
 

@@ -6,8 +6,10 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.core.content.FileProvider
 import com.nendo.argosy.data.download.ZipExtractor
+import com.nendo.argosy.data.storage.StoragePathUtils
 import com.nendo.argosy.data.launcher.SteamLaunchers
 import com.nendo.argosy.data.local.dao.EmulatorConfigDao
 import com.nendo.argosy.data.repository.BiosRepository
@@ -573,10 +575,9 @@ class GameLauncher @Inject constructor(
         platformSlug: String,
         config: LaunchConfig.Custom,
         forResume: Boolean
-    ): Intent {
-        val needsUriPermission = config.intentExtras.values.any { it is ExtraValue.FilePath || it is ExtraValue.FileUri }
+    ): Intent? {
+        val needsUriPermission = config.intentExtras.values.any { it is ExtraValue.FileUri }
 
-        // Pre-grant URI permission to emulator package for Android 11+ Scoped Storage compatibility
         if (needsUriPermission) {
             val uri = getFileUri(romFile)
             try {
@@ -619,10 +620,17 @@ class GameLauncher @Inject constructor(
             val shouldSkipExtras = emulator.launchAction == Intent.ACTION_VIEW
             if (!shouldSkipExtras) {
                 config.intentExtras.forEach { (key, extraValue) ->
-                    // Using when as expression enforces compile-time exhaustiveness for sealed class
                     @Suppress("UNUSED_VARIABLE")
                     val handled: Unit = when (extraValue) {
                         is ExtraValue.FilePath -> putExtra(key, romFile.absolutePath)
+                        is ExtraValue.DocumentUri -> {
+                            val docUri = getDocumentUri(romFile)
+                            if (docUri == null) {
+                                Logger.error(TAG, "Cannot build document URI for ${romFile.absolutePath} — game cannot be launched")
+                                return null
+                            }
+                            putExtra(key, docUri.toString())
+                        }
                         is ExtraValue.FileUri -> {
                             hasFileUri = true
                             putExtra(key, getFileUri(romFile).toString())
@@ -634,7 +642,6 @@ class GameLauncher @Inject constructor(
                 }
             }
 
-            // Include URI in clipData for emulators that may read from it (Android 11+ Scoped Storage)
             if (hasFileUri || needsUriPermission) {
                 val uri = getFileUri(romFile)
                 clipData = ClipData.newRawUri(null, uri)
@@ -850,6 +857,24 @@ class GameLauncher @Inject constructor(
             Logger.warn(TAG, "FileProvider failed for ${file.name}, using file:// URI", e)
             Uri.fromFile(file)
         }
+    }
+
+    private fun getDocumentUri(file: File): Uri? {
+        val (volumeId, relativePath) = StoragePathUtils.extractVolumeAndPath(file.absolutePath)
+            ?: run {
+                Logger.warn(TAG, "Cannot build document URI for non-documentable path: ${file.absolutePath}")
+                return null
+            }
+        val parentRelative = if (relativePath.contains("/")) {
+            relativePath.substringBeforeLast("/")
+        } else {
+            ""
+        }
+        val treeUri = DocumentsContract.buildTreeDocumentUri(
+            "com.android.externalstorage.documents",
+            "$volumeId:$parentRelative"
+        )
+        return DocumentsContract.buildDocumentUriUsingTree(treeUri, "$volumeId:$relativePath")
     }
 
     private fun getMimeType(file: File): String {
