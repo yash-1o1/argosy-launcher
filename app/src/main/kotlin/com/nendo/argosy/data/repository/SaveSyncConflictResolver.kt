@@ -84,7 +84,11 @@ class SaveSyncConflictResolver @Inject constructor(
                 val game = gameDao.getById(gameId)
                 val romBaseName = game?.localPath?.let { File(it).nameWithoutExtension }
 
-                val config = SavePathRegistry.getConfigIncludingUnsupported(emulatorId)
+                val config = if (game != null) {
+                    SavePathRegistry.getConfigForPlatform(emulatorId, game.platformSlug)
+                } else {
+                    SavePathRegistry.getConfigIncludingUnsupported(emulatorId)
+                }
                 val serverSave = if (activeChannel != null) {
                     val channelSave = matchingSaves
                         .filter { it.slot != null && SaveSyncApiClient.equalsNormalized(it.slot, activeChannel) }

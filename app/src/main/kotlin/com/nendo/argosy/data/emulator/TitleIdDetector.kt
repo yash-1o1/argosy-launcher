@@ -92,7 +92,7 @@ class TitleIdDetector @Inject constructor(
     ): DetectedTitleId? {
         Logger.debug(TAG, "[SaveSync] DETECT | Starting title ID detection | emulator=$emulatorId, package=$emulatorPackage, platform=$platformSlug, sessionStart=$sessionStartTime")
 
-        val config = SavePathRegistry.getConfigIncludingUnsupported(emulatorId)
+        val config = SavePathRegistry.getConfigForPlatform(emulatorId, platformSlug)
         if (config == null) {
             Logger.debug(TAG, "[SaveSync] DETECT | No config for emulator | emulator=$emulatorId")
             return null

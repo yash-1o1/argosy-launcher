@@ -332,7 +332,7 @@ class SaveSyncApiClient @Inject constructor(
             return@withContext SaveSyncResult.NoSaveFound
         }
 
-        val config = SavePathRegistry.getConfigIncludingUnsupported(resolvedEmulatorId)
+        val config = SavePathRegistry.getConfigForPlatform(resolvedEmulatorId, game.platformSlug)
         val isDirectory = fal.isDirectory(localPath)
         val isFolderBased = config?.usesFolderBasedSaves == true && isDirectory
         val isGciBundle = config?.usesGciFormat == true
@@ -740,7 +740,7 @@ class SaveSyncApiClient @Inject constructor(
             return@withContext SaveSyncResult.Error("Save not found on server")
         }
 
-        val config = SavePathRegistry.getConfigIncludingUnsupported(resolvedEmulatorId)
+        val config = SavePathRegistry.getConfigForPlatform(resolvedEmulatorId, game.platformSlug)
         val isGciFormat = config?.usesGciFormat == true
         val isFolderBased = config?.usesFolderBasedSaves == true &&
             serverSave.fileName.endsWith(".zip", ignoreCase = true) && !isGciFormat
@@ -1153,7 +1153,12 @@ class SaveSyncApiClient @Inject constructor(
             return@withContext false
         } ?: return@withContext false
 
-        val config = SavePathRegistry.getConfigIncludingUnsupported(emulatorId)
+        val platformSlug = gameId?.let { gameDao.getById(it)?.platformSlug }
+        val config = if (platformSlug != null) {
+            SavePathRegistry.getConfigForPlatform(emulatorId, platformSlug)
+        } else {
+            SavePathRegistry.getConfigIncludingUnsupported(emulatorId)
+        }
         val isGciFormat = config?.usesGciFormat == true
         val isFolderBased = config?.usesFolderBasedSaves == true &&
             serverSave.fileName.endsWith(".zip", ignoreCase = true) && !isGciFormat

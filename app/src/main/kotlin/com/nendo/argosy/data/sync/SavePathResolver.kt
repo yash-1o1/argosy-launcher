@@ -65,8 +65,8 @@ class SavePathResolver @Inject constructor(
             return@withContext null
         }
 
-        val config = emulatorPackage?.let { SavePathRegistry.getConfigIncludingUnsupportedByPackage(it) }
-            ?: SavePathRegistry.getConfigIncludingUnsupported(emulatorId)
+        val config = emulatorPackage?.let { SavePathRegistry.getConfigForPlatformByPackage(it, platformSlug) }
+            ?: SavePathRegistry.getConfigForPlatform(emulatorId, platformSlug)
         if (config == null) {
             Logger.warn(TAG, "[SaveSync] DISCOVER | No save path config | emulatorId=$emulatorId, emulatorPackage=$emulatorPackage")
             return@withContext null
@@ -552,7 +552,7 @@ class SavePathResolver @Inject constructor(
     ): String? {
         if (romPath == null) return null
 
-        val config = SavePathRegistry.getConfigIncludingUnsupported(emulatorId) ?: return null
+        val config = SavePathRegistry.getConfigForPlatform(emulatorId, platformSlug) ?: return null
         if (!config.usesFolderBasedSaves) return null
 
         val romFile = File(romPath)
@@ -583,10 +583,10 @@ class SavePathResolver @Inject constructor(
         cachedTitleId: String? = null,
         emulatorPackage: String? = null
     ): String? {
-        val config = SavePathRegistry.getConfigIncludingUnsupported(emulatorId) ?: return null
+        val config = SavePathRegistry.getConfigForPlatform(emulatorId, platformSlug) ?: return null
         if (!config.usesFolderBasedSaves) return null
 
-        val userConfig = emulatorSaveConfigDao.getByEmulator(emulatorId)
+        val userConfig = emulatorSaveConfigDao.getByEmulator(config.emulatorId)
         val basePathOverride = userConfig?.takeIf { it.isUserOverride }?.savePathPattern
 
         val baseDir = when (platformSlug) {

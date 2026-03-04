@@ -506,6 +506,16 @@ object SavePathRegistry {
         return getConfigIncludingUnsupported(configId)
     }
 
+    fun getConfigForPlatform(emulatorId: String, platformSlug: String): SavePathConfig? {
+        val platformVariantId = "${emulatorId}_${platformSlug}"
+        return configs[platformVariantId] ?: configs[emulatorId]
+    }
+
+    fun getConfigForPlatformByPackage(packageName: String, platformSlug: String): SavePathConfig? {
+        val configId = resolveConfigIdForPackage(packageName) ?: return null
+        return getConfigForPlatform(configId, platformSlug)
+    }
+
     fun getAllConfigs(): Map<String, SavePathConfig> = configs.filterValues { it.supported }
 
     fun canSyncWithSettings(
