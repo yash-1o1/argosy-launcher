@@ -184,13 +184,14 @@ class UpdateRepository @Inject constructor(
                 val abiSuffix = when {
                     deviceAbi.startsWith("arm64") -> "arm64"
                     deviceAbi.startsWith("armeabi") || deviceAbi.startsWith("arm") -> "arm32"
-                    else -> "arm64"
+                    else -> null
                 }
-                val apkAsset = release.assets.find {
-                    it.name.endsWith(".apk") && it.name.contains(abiSuffix)
-                } ?: release.assets.find {
-                    it.name.endsWith(".apk")
-                }
+                val apkAssets = release.assets.filter { it.name.endsWith(".apk") }
+                val apkAsset = if (abiSuffix != null) {
+                    apkAssets.find { it.name.contains(abiSuffix) }
+                } else null
+                    ?: apkAssets.find { !it.name.contains("arm64") && !it.name.contains("arm32") }
+                    ?: apkAssets.firstOrNull()
                 if (apkAsset == null) {
                     val error = UpdateState.Error("No APK found in release")
                     _updateState.value = error
