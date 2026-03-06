@@ -45,6 +45,8 @@ class RomMAchievementService @Inject constructor(
                 val refreshedUserResponse = currentApi.getCurrentUser()
                 if (refreshedUserResponse.isSuccessful) {
                     progression = refreshedUserResponse.body()?.raProgression?.results ?: emptyList()
+                } else {
+                    Logger.warn(TAG, "Post-refresh user fetch failed (${refreshedUserResponse.code()}); using pre-refresh progression")
                 }
             } else {
                 raProgressionRefreshedThisSession = true
@@ -83,6 +85,8 @@ class RomMAchievementService @Inject constructor(
                 val refreshedUserResponse = currentApi.getCurrentUser()
                 if (refreshedUserResponse.isSuccessful) {
                     progression = refreshedUserResponse.body()?.raProgression?.results ?: emptyList()
+                } else {
+                    Logger.warn(TAG, "Post-refresh user fetch failed (${refreshedUserResponse.code()}); using pre-refresh progression")
                 }
             } else {
                 cachedRAProgression = progression
