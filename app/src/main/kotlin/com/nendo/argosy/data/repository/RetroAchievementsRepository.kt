@@ -13,6 +13,7 @@ import com.nendo.argosy.data.remote.ra.RAApi
 import com.nendo.argosy.data.remote.ra.RACredentials
 import com.nendo.argosy.data.remote.ra.RAPatchData
 import com.nendo.argosy.util.Logger
+import com.nendo.argosy.util.parseTimestamp
 import com.squareup.moshi.Moshi
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -27,6 +28,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val TAG = "RetroAchievementsRepository"
+const val RA_BADGE_BASE_URL = "https://media.retroachievements.org/Badge/"
 
 sealed class RALoginResult {
     data class Success(val username: String) : RALoginResult()
@@ -385,7 +387,7 @@ class RetroAchievementsRepository @Inject constructor(
 
                 val unlockedTimestamps = achievements
                     .filter { it.dateEarned != null }
-                    .mapNotNull { ach -> com.nendo.argosy.util.parseTimestamp(ach.dateEarned!!)?.let { ts -> ach.id to ts } }
+                    .mapNotNull { ach -> parseTimestamp(ach.dateEarned!!)?.let { ts -> ach.id to ts } }
                     .toMap()
 
                 val hardcoreUnlockedIds = achievements
@@ -395,7 +397,7 @@ class RetroAchievementsRepository @Inject constructor(
 
                 val hardcoreUnlockedTimestamps = achievements
                     .filter { it.dateEarnedHardcore != null }
-                    .mapNotNull { ach -> com.nendo.argosy.util.parseTimestamp(ach.dateEarnedHardcore!!)?.let { ts -> ach.id to ts } }
+                    .mapNotNull { ach -> parseTimestamp(ach.dateEarnedHardcore!!)?.let { ts -> ach.id to ts } }
                     .toMap()
 
                 val mergedUnlockedTimestamps = unlockedTimestamps.toMutableMap()
@@ -471,12 +473,12 @@ class RetroAchievementsRepository @Inject constructor(
                 val hardcoreIds = body?.hardcoreUnlocks?.map { it.id }?.toSet() ?: emptySet()
                 val timestamps = body?.unlocks
                     ?.filter { it.`when` != null }
-                    ?.mapNotNull { unlock -> com.nendo.argosy.util.parseTimestamp(unlock.`when`!!)?.let { ts -> unlock.id to ts } }
+                    ?.mapNotNull { unlock -> parseTimestamp(unlock.`when`!!)?.let { ts -> unlock.id to ts } }
                     ?.toMap()
                     ?: emptyMap()
                 val hardcoreTimestamps = body?.hardcoreUnlocks
                     ?.filter { it.`when` != null }
-                    ?.mapNotNull { unlock -> com.nendo.argosy.util.parseTimestamp(unlock.`when`!!)?.let { ts -> unlock.id to ts } }
+                    ?.mapNotNull { unlock -> parseTimestamp(unlock.`when`!!)?.let { ts -> unlock.id to ts } }
                     ?.toMap()
                     ?: emptyMap()
                 val mergedTimestamps = timestamps.toMutableMap()

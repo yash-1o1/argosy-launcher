@@ -28,6 +28,12 @@ class RomMAchievementService @Inject constructor(
         return cachedRAProgression[raGameId] ?: emptyList()
     }
 
+    private fun updateCache(progression: List<RomMRAGameProgression>) {
+        cachedRAProgression = progression
+            .filter { it.romRaId != null }
+            .associate { it.romRaId!! to it.earnedAchievements }
+    }
+
     suspend fun refreshRAProgressionOnStartup() {
         val currentApi = api ?: return
         try {
@@ -48,15 +54,9 @@ class RomMAchievementService @Inject constructor(
                 } else {
                     Logger.warn(TAG, "Post-refresh user fetch failed (${refreshedUserResponse.code()}); using pre-refresh progression")
                 }
-            } else {
-                raProgressionRefreshedThisSession = true
             }
 
-            cachedRAProgression = progression
-                .filter { it.romRaId != null }
-                .associate { gameProgress ->
-                    gameProgress.romRaId!! to gameProgress.earnedAchievements
-                }
+            updateCache(progression)
         } catch (_: Exception) {
         }
     }
@@ -89,20 +89,11 @@ class RomMAchievementService @Inject constructor(
                     Logger.warn(TAG, "Post-refresh user fetch failed (${refreshedUserResponse.code()}); using pre-refresh progression")
                 }
             } else {
-                cachedRAProgression = progression
-                    .filter { it.romRaId != null }
-                    .associate { gameProgress ->
-                        gameProgress.romRaId!! to gameProgress.earnedAchievements
-                    }
+                updateCache(progression)
                 return RomMResult.Error("Failed to refresh RA progression: HTTP ${response.code()}")
             }
 
-            cachedRAProgression = progression
-                .filter { it.romRaId != null }
-                .associate { gameProgress ->
-                    gameProgress.romRaId!! to gameProgress.earnedAchievements
-                }
-
+            updateCache(progression)
             RomMResult.Success(Unit)
         } catch (e: Exception) {
             RomMResult.Error(e.message ?: "Failed to refresh RA progression")

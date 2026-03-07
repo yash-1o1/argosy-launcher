@@ -8,6 +8,7 @@ import com.nendo.argosy.ui.screens.gamedetail.toAchievementUi
 import com.nendo.argosy.data.remote.romm.RomMEarnedAchievement
 import com.nendo.argosy.data.remote.romm.RomMRepository
 import com.nendo.argosy.data.remote.romm.RomMResult
+import com.nendo.argosy.data.repository.RA_BADGE_BASE_URL
 import com.nendo.argosy.data.repository.RetroAchievementsRepository
 import com.nendo.argosy.ui.screens.common.AchievementUpdateBus
 import com.nendo.argosy.util.parseTimestamp
@@ -36,16 +37,15 @@ class AchievementDelegate @Inject constructor(
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     suspend fun loadCached(gameId: Long, hasRommId: Boolean) {
-        if (!hasRommId) {
+        val cached = achievementDao.getByGameId(gameId)
+        if (!hasRommId && cached.isEmpty()) {
             _achievements.value = emptyList()
             return
         }
-        _achievements.value = achievementDao.getByGameId(gameId).map { it.toAchievementUi() }
+        _achievements.value = cached.map { it.toAchievementUi() }
     }
 
     fun refresh(scope: CoroutineScope, gameId: Long, rommId: Long?) {
-        if (rommId == null) return
-
         scope.launch {
             _isLoading.value = true
             val fresh = fetchAndCacheAchievements(rommId, gameId)
@@ -56,7 +56,7 @@ class AchievementDelegate @Inject constructor(
         }
     }
 
-    private suspend fun fetchAndCacheAchievements(rommId: Long, gameId: Long): List<AchievementUi> {
+    private suspend fun fetchAndCacheAchievements(rommId: Long?, gameId: Long): List<AchievementUi> {
         val game = gameRepository.getById(gameId)
         val raId = game?.raId
 
@@ -65,8 +65,10 @@ class AchievementDelegate @Inject constructor(
             if (raResults.isNotEmpty()) return raResults
         }
 
-        val rommResults = fetchAchievementsFromRomM(rommId, gameId)
-        if (rommResults.isNotEmpty()) return rommResults
+        if (rommId != null) {
+            val rommResults = fetchAchievementsFromRomM(rommId, gameId)
+            if (rommResults.isNotEmpty()) return rommResults
+        }
 
         return emptyList()
     }
@@ -80,8 +82,8 @@ class AchievementDelegate @Inject constructor(
         raData.achievements.forEach { achievement ->
             val isUnlocked = achievement.id in raData.unlockedIds
             val isHardcore = achievement.id in raData.hardcoreUnlockedIds
-            val badgeUrl = achievement.badgeName?.let { "https://media.retroachievements.org/Badge/$it.png" }
-            val badgeUrlLock = achievement.badgeName?.let { "https://media.retroachievements.org/Badge/${it}_lock.png" }
+            val badgeUrl = achievement.badgeName?.let { "${RA_BADGE_BASE_URL}$it.png" }
+            val badgeUrlLock = achievement.badgeName?.let { "${RA_BADGE_BASE_URL}${it}_lock.png" }
 
             entities += AchievementEntity(
                 gameId = gameId,

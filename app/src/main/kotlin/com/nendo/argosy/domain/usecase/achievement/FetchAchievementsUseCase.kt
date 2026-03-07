@@ -6,6 +6,7 @@ import com.nendo.argosy.data.local.dao.GameDao
 import com.nendo.argosy.data.local.entity.AchievementEntity
 import com.nendo.argosy.data.remote.romm.RomMRepository
 import com.nendo.argosy.data.remote.romm.RomMResult
+import com.nendo.argosy.data.repository.RA_BADGE_BASE_URL
 import com.nendo.argosy.data.repository.RetroAchievementsRepository
 import com.nendo.argosy.util.parseTimestamp
 import javax.inject.Inject
@@ -41,8 +42,8 @@ class FetchAchievementsUseCase @Inject constructor(
         val raData = raRepository.getGameAchievementsWithProgress(raId) ?: return null
 
         val entities = raData.achievements.map { achievement ->
-            val badgeUrl = achievement.badgeName?.let { "https://media.retroachievements.org/Badge/$it.png" }
-            val badgeUrlLock = achievement.badgeName?.let { "https://media.retroachievements.org/Badge/${it}_lock.png" }
+            val badgeUrl = achievement.badgeName?.let { "${RA_BADGE_BASE_URL}$it.png" }
+            val badgeUrlLock = achievement.badgeName?.let { "${RA_BADGE_BASE_URL}${it}_lock.png" }
 
             AchievementEntity(
                 gameId = gameId,
@@ -58,6 +59,7 @@ class FetchAchievementsUseCase @Inject constructor(
             )
         }
         achievementDao.replaceForGame(gameId, entities)
+        gameDao.updateAchievementsFetchedAt(gameId, System.currentTimeMillis())
         gameDao.updateAchievementCount(gameId, raData.totalCount, raData.earnedCount)
         queueBadgeCaching(gameId)
 
@@ -94,6 +96,7 @@ class FetchAchievementsUseCase @Inject constructor(
                     )
                 }
                 achievementDao.replaceForGame(gameId, entities)
+                gameDao.updateAchievementsFetchedAt(gameId, System.currentTimeMillis())
 
                 val earnedCount = entities.count { it.isUnlocked }
                 gameDao.updateAchievementCount(gameId, entities.size, earnedCount)
